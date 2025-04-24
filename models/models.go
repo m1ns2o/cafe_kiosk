@@ -60,12 +60,12 @@ type OrderItemRequest struct {
 }
 
 type PaymentRequest struct {
-    OrderID     uint   `json:"order_id" binding:"required"`
-    PaymentType string `json:"payment_type"` // 카드, 현금 등
-    Amount      int    `json:"amount" binding:"required"`
+    Amount int64 `json:"amount" binding:"required"`
 }
 
+// PaymentResponse 결제 응답 구조체
 type PaymentResponse struct {
-    Success bool   `json:"success"`
-    Message string `json:"message"`
+    Success bool                   `json:"success"`
+    Message string                 `json:"message"`
+    Details map[string]interface{} `json:"details,omitempty"`
 }
