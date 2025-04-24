@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>키오스크 API 테스트</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8">키오스크 API 테스트</h1>
+        
+        <!-- 카테고리 섹션 -->
+        <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <h2 class="text-xl font-bold mb-4">카테고리 관리</h2>
+            
+            <div class="mb-4">
+                <input type="text" id="categoryName" placeholder="카테고리 이름" 
+                       class="border p-2 rounded mr-2">
+                <button onclick="addCategory()" 
+                        class="bg-blue-500 text-white px-4 py-2 rounded">
+                    카테고리 추가
+                </button>
+            </div>
+            
+            <button onclick="getCategories()" 
+                    class="bg-gray-500 text-white px-4 py-2 rounded">
+                카테고리 목록 조회
+            </button>
+            
+            <div id="categoryList" class="mt-4"></div>
+        </div>
+        
+        <!-- 메뉴 섹션 -->
+        <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <h2 class="text-xl font-bold mb-4">메뉴 관리</h2>
+            
+            <div class="mb-4">
+                <input type="number" id="menuCategoryId" placeholder="카테고리 ID" 
+                       class="border p-2 rounded mr-2 w-24">
+                <input type="text" id="menuName" placeholder="메뉴 이름" 
+                       class="border p-2 rounded mr-2">
+                <input type="number" id="menuPrice" placeholder="가격" 
+                       class="border p-2 rounded mr-2 w-32">
+                <button onclick="addMenu()" 
+                        class="bg-blue-500 text-white px-4 py-2 rounded">
+                    메뉴 추가
+                </button>
+            </div>
+            
+            <button onclick="getMenus()" 
+                    class="bg-gray-500 text-white px-4 py-2 rounded">
+                메뉴 목록 조회
+            </button>
+            
+            <div id="menuList" class="mt-4"></div>
+        </div>
+        
+        <!-- 주문 섹션 -->
+        <div class="bg-white p-6 rounded-lg shadow mb-6">
+            <h2 class="text-xl font-bold mb-4">주문 관리</h2>
+            
+            <div class="mb-4">
+                <div id="orderItems" class="mb-4">
+                    <div class="order-item mb-2">
+                        <input type="number" placeholder="메뉴 ID" 
+                               class="border p-2 rounded mr-2 w-24 menu-id">
+                        <input type="number" placeholder="수량" 
+                               class="border p-2 rounded mr-2 w-24 quantity">
+                    </div>
+                </div>
+                <button onclick="addOrderItem()" 
+                        class="bg-green-500 text-white px-4 py-2 rounded mr-2">
+                    항목 추가
+                </button>
+                <button onclick="createOrder()" 
+                        class="bg-blue-500 text-white px-4 py-2 rounded">
+                    주문 생성
+                </button>
+            </div>
+            
+            <button onclick="getOrders()" 
+                    class="bg-gray-500 text-white px-4 py-2 rounded">
+                주문 목록 조회
+            </button>
+            
+            <div id="orderList" class="mt-4"></div>
+        </div>
+        
+        <!-- 결과 표시 -->
+        <div class="bg-white p-6 rounded-lg shadow">
+            <h2 class="text-xl font-bold mb-4">결과</h2>
+            <pre id="result" class="bg-gray-100 p-4 rounded overflow-auto"></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        
+        async function addCategory() {
+            const name = document.getElementById('categoryName').value;
+            try {
+                const response = await fetch(`${API_BASE}/categories`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name})
+                });
+                const data = await response.json();
+                showResult(data);
+                if (response.ok) getCategories();
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+        
+        async function getCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/categories`);
+                const data = await response.json();
+                showResult(data);
+                updateCategoryList(data);
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+        
+        async function addMenu() {
+            const categoryId = parseInt(document.getElementById('menuCategoryId').value);
+            const name = document.getElementById('menuName').value;
+            const price = parseInt(document.getElementById('menuPrice').value);
+            
+            try {
+                const response = await fetch(`${API_BASE}/menus`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({category_id: categoryId, name, price})
+                });
+                const data = await response.json();
+                showResult(data);
+                if (response.ok) getMenus();
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+        
+        async function getMenus() {
+            try {
+                const response = await fetch(`${API_BASE}/menus`);
+                const data = await response.json();
+                showResult(data);
+                updateMenuList(data);
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+        
+        function addOrderItem() {
+            const template = `
+                <div class="order-item mb-2">
+                    <input type="number" placeholder="메뉴 ID" 
+                           class="border p-2 rounded mr-2 w-24 menu-id">
+                    <input type="number" placeholder="수량" 
+                           class="border p-2 rounded mr-2 w-24 quantity">
+                </div>
+            `;
+            document.getElementById('orderItems').insertAdjacentHTML('beforeend', template);
+        }
+        
+        async function createOrder() {
+            const items = [];
+            document.querySelectorAll('.order-item').forEach(item => {
+                const menuId = parseInt(item.querySelector('.menu-id').value);
+                const quantity = parseInt(item.querySelector('.quantity').value);
+                if (menuId && quantity) {
+                    items.push({menu_id: menuId, quantity});
+                }
+            });
+            
+            try {
+                const response = await fetch(`${API_BASE}/orders`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({items})
+                });
+                const data = await response.json();
+                showResult(data);
+                if (response.ok) getOrders();
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+        
+        async function getOrders() {
+            try {
+                const response = await fetch(`${API_BASE}/orders`);
+                const data = await response.json();
+                showResult(data);
+                updateOrderList(data);
+            } catch (error) {
+                showResult({error: error.message});
+            }
+        }
+        
+        function showResult(data) {
+            document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+        }
+        
+        function updateCategoryList(categories) {
+            const html = categories.map(cat => `
+                <div class="border-b py-2">
+                    <span class="font-bold">ID: ${cat.id}</span> - ${cat.name}
+                </div>
+            `).join('');
+            document.getElementById('categoryList').innerHTML = html;
+        }
+        
+        function updateMenuList(menus) {
+            const html = menus.map(menu => `
+                <div class="border-b py-2">
+                    <span class="font-bold">ID: ${menu.id}</span> - ${menu.name} 
+                    (₩${menu.price}) [카테고리: ${menu.category_id}]
+                </div>
+            `).join('');
+            document.getElementById('menuList').innerHTML = html;
+        }
+        
+        function updateOrderList(orders) {
+            const html = orders.map(order => `
+                <div class="border-b py-2">
+                    <span class="font-bold">주문 ID: ${order.id}</span> - 
+                    총액: ₩${order.total_price}
+                </div>
+            `).join('');
+            document.getElementById('orderList').innerHTML = html;
+        }
+        
+        // 초기 데이터 로드
+        window.onload = () => {
+            getCategories();
+            getMenus();
+            getOrders();
+        };
+    </script>
+</body>
+</html>
