@@ -6,7 +6,7 @@ import (
     "strings"
     "sync"
     "time"
-    
+    "net/http"
     "github.com/gin-gonic/gin"
     "github.com/joho/godotenv"
     "kiosk/database"
@@ -136,15 +136,19 @@ func main() {
     routes.SetupRoutes(r)
 
     // 정적 파일 서빙 (Vue 등)
-    r.Static("/static", "./static")
-    r.StaticFile("/test", "./static/test.html")  // 테스트 페이지 직접 접근
+    r.StaticFS("/assets", http.Dir("./static/dist/assets"))
+    r.StaticFile("/vite.svg", "./static/dist/vite.svg")
     
-    // Vue 앱 관련 설정
-    r.StaticFile("/", "./dist/index.html")
+    // 루트 경로에 대해서만 index.html 반환
+    r.GET("/", func(c *gin.Context) {
+        c.File("./static/dist/index.html")
+    })
+    
+    // SPA를 위한 fallback
     r.NoRoute(func(c *gin.Context) {
-        // API 경로가 아닌 경우에만 index.html 반환
-        if !strings.HasPrefix(c.Request.URL.Path, "/api") {
-            c.File("./dist/index.html")
+        path := c.Request.URL.Path
+        if !strings.HasPrefix(path, "/api") && !strings.HasPrefix(path, "/assets") {
+            c.File("./static/dist/index.html")
         }
     })
 
