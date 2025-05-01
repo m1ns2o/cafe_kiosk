@@ -7,9 +7,17 @@ import (
     "kiosk/models"
 )
 
+// func GetCategories(c *gin.Context) {
+//     var categories []models.Category
+//     if err := database.DB.Preload("Menus").Find(&categories).Error; err != nil {
+//         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+//         return
+//     }
+//     c.JSON(http.StatusOK, categories)
+// }
 func GetCategories(c *gin.Context) {
     var categories []models.Category
-    if err := database.DB.Preload("Menus").Find(&categories).Error; err != nil {
+    if err := database.DB.Find(&categories).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
