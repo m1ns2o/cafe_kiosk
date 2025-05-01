@@ -42,15 +42,7 @@ func CreateOrder(c *gin.Context) {
         }
     }()
 
-    // 주문 생성
-    order := models.Order{}
-    if err := tx.Create(&order).Error; err != nil {
-        tx.Rollback()
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
-
-    // 주문 항목 생성 및 총액 계산
+    // 주문 항목 데이터 준비 및 총액 계산
     var totalPrice int
     orderItems := make([]models.OrderItem, 0, len(req.Items))
 
@@ -62,8 +54,8 @@ func CreateOrder(c *gin.Context) {
             return
         }
 
+        // 아직 OrderID는 설정하지 않음 (주문 생성 후 설정)
         orderItem := models.OrderItem{
-            OrderID:  order.ID,
             MenuID:   item.MenuID,
             Quantity: item.Quantity,
             Price:    menu.Price,
@@ -72,15 +64,23 @@ func CreateOrder(c *gin.Context) {
         totalPrice += menu.Price * item.Quantity
     }
 
-    // 주문 항목 일괄 생성
-    if err := tx.Create(&orderItems).Error; err != nil {
+    // 총액이 계산된 후 주문 생성
+    order := models.Order{
+        TotalPrice: totalPrice,
+    }
+    if err := tx.Create(&order).Error; err != nil {
         tx.Rollback()
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }
 
-    // 총액 업데이트
-    if err := tx.Model(&order).Update("total_price", totalPrice).Error; err != nil {
+    // 주문 ID 설정 및 주문 항목 저장
+    for i := range orderItems {
+        orderItems[i].OrderID = order.ID
+    }
+
+    // 주문 항목 일괄 생성
+    if err := tx.Create(&orderItems).Error; err != nil {
         tx.Rollback()
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
@@ -92,9 +92,9 @@ func CreateOrder(c *gin.Context) {
         return
     }
 
-    // 생성된 주문 조회 (Preload 사용)
+    // 생성된 주문 조회 (Preload 사용, Category 제외)
     var completeOrder models.Order
-    if err := database.DB.Preload("OrderItems.Menu.Category").First(&completeOrder, order.ID).Error; err != nil {
+    if err := database.DB.Preload("OrderItems.Menu").First(&completeOrder, order.ID).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
         return
     }

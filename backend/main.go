@@ -1,17 +1,18 @@
 package main
 
 import (
-    "log"
-    "os"
-    "strings"
-    "sync"
-    "time"
-    "net/http"
-    "github.com/gin-gonic/gin"
-    "github.com/joho/godotenv"
-    "kiosk/database"
-    "kiosk/routes"
-    "kiosk/utils"
+	"kiosk/database"
+	"kiosk/routes"
+	"kiosk/utils"
+	"log"
+	"net/http"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 // DepositState 예수금 상태를 관리하는 구조체
@@ -136,22 +137,40 @@ func main() {
     routes.SetupRoutes(r)
 
     // 정적 파일 서빙 (Vue 등)
-    r.StaticFS("/assets", http.Dir("./static/dist/assets"))
-    r.StaticFile("/vite.svg", "./static/dist/vite.svg")
-    
-    // 루트 경로에 대해서만 index.html 반환
-    r.GET("/", func(c *gin.Context) {
-        c.File("./static/dist/index.html")
-    })
-    
-    // SPA를 위한 fallback
-    r.NoRoute(func(c *gin.Context) {
-        path := c.Request.URL.Path
-        if !strings.HasPrefix(path, "/api") && !strings.HasPrefix(path, "/assets") {
-            c.File("./static/dist/index.html")
-        }
-    })
+    // 정적 파일 서빙 설정
+    // 정적 파일 서빙 설정
+r.StaticFS("/assets", http.Dir("./static/dist/assets"))
+r.StaticFile("/vite.svg", "./static/dist/vite.svg")
+r.StaticFile("/test.html", "./static/test.html")
 
+// uploads 폴더는 별도로 정의 - 라우터 그룹으로 처리
+uploads := r.Group("/uploads")
+{
+    uploads.StaticFS("/", http.Dir("./uploads"))
+}
+
+// 메인 페이지
+r.GET("/", func(c *gin.Context) {
+    c.File("./static/dist/index.html")
+})
+
+// SPA를 위한 fallback - 명시적으로 uploads 경로 제외
+r.NoRoute(func(c *gin.Context) {
+    path := c.Request.URL.Path
+    
+    // uploads 경로에 대한 요청은 처리하지 않음 (404 반환)
+    if strings.HasPrefix(path, "/uploads/") {
+        c.AbortWithStatus(http.StatusNotFound)
+        return
+    }
+    
+    // API 및 정적 파일 경로가 아니면 index.html 제공
+    if !strings.HasPrefix(path, "/api") && 
+       !strings.HasPrefix(path, "/assets") && 
+       path != "/test" {
+        c.File("./static/dist/index.html")
+    }
+})
     // 서버 시작
     r.Run(":8080")
 }
