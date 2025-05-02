@@ -160,23 +160,18 @@ onMounted(async () => {
         
         <div class="payment-status" :class="paymentStatus">
           <div class="status-icon">
-            <span v-if="paymentStatus === 'pending'" class="material-icon">hourglass_empty</span>
-            <span v-else-if="paymentStatus === 'success'" class="material-icon">check_circle</span>
-            <span v-else class="material-icon">error</span>
+            <span v-if="paymentStatus === 'pending'" class="material-icons">hourglass_empty</span>
+            <span v-else-if="paymentStatus === 'success'" class="material-icons">check_circle</span>
+            <span v-else class="material-icons">error</span>
           </div>
           <div class="status-message">{{ statusMessage }}</div>
           
           <!-- 결제 실패 시 재시도 버튼 표시 -->
           <button v-if="paymentStatus === 'failed'" class="retry-btn" @click="retryPayment">
-            <span class="material-icon mr-1">refresh</span>
+            <span class="material-icons mr-1">refresh</span>
             결제 재시도
           </button>
           
-          <div v-if="paymentDetails && paymentStatus === 'failed'" class="payment-details">
-            <p>예상 금액: {{ paymentDetails.expected_amount.toLocaleString() }}원</p>
-            <p>실제 변동액: {{ paymentDetails.actual_change.toLocaleString() }}원</p>
-            <p>타임아웃: {{ paymentDetails.timeout_after }}</p>
-          </div>
         </div>
       </div>
       
@@ -185,6 +180,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+
 .payment-view-container {
   display: flex;
   flex-direction: column;
@@ -295,7 +291,7 @@ onMounted(async () => {
 .cart-summary h2 {
   font-size: 1.2rem;
   margin-bottom: 10px;
-  color: var(--text-secondary, #555);
+  color: var(--text-secondary);
 }
 
 .cart-items-list {
@@ -326,7 +322,7 @@ onMounted(async () => {
 .item-price {
   flex: 1;
   text-align: right;
-  color: var(--button-primary, #4caf50);
+  color: var(--button-primary);
   font-weight: 500;
 }
 
@@ -357,7 +353,7 @@ onMounted(async () => {
   margin-bottom: 10px;
 }
 
-.status-icon .material-icon {
+.status-icon .material-icons {
   font-family: 'Material Icons';
   font-weight: normal;
   font-style: normal;
