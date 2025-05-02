@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { CategoryAPI } from '../api/menu';
 import type { MenuItem, Category } from '../types/menuType';
 
@@ -8,6 +8,42 @@ const selectedCategory = ref<number>(0);
 const categories = ref<Category[]>([]);
 // const isLoading = ref<boolean>(true);
 const error = ref<string | null>(null);
+const cartItems = ref<{item: MenuItem, quantity: number}[]>([]);
+
+// 페이지네이션 관련 변수
+const currentPage = ref(1);
+const itemsPerPage = 6; // 한 페이지에 표시할 아이템 수
+
+// 현재 페이지에 표시할 메뉴 아이템
+const paginatedMenuItems = computed(() => {
+  const startIndex = (currentPage.value - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  return menuItems.value.slice(startIndex, endIndex);
+});
+
+// 총 페이지 수
+const totalPages = computed(() => {
+  return Math.ceil(menuItems.value.length / itemsPerPage);
+});
+
+// 페이지 변경 함수
+const changePage = (page: number) => {
+  currentPage.value = page;
+};
+
+// 이전 페이지로 이동
+const prevPage = () => {
+  if (currentPage.value > 1) {
+    currentPage.value--;
+  }
+};
+
+// 다음 페이지로 이동
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) {
+    currentPage.value++;
+  }
+};
 
 // 카테고리가 변경되면 해당 카테고리의 메뉴를 불러오는 함수
 const loadMenuItems = async (categoryId: number) => {
@@ -28,10 +64,63 @@ const loadMenuItems = async (categoryId: number) => {
   }
 };
 
-// 카테고리가 변경될 때마다 메뉴 아이템 업데이트
+// 장바구니에 아이템 추가
+const addToCart = (item: MenuItem) => {
+  const existingItem = cartItems.value.find(cartItem => cartItem.item.id === item.id);
+  
+  if (existingItem) {
+    existingItem.quantity += 1;
+  } else {
+    cartItems.value.push({ item, quantity: 1 });
+  }
+};
+
+// 장바구니에서 아이템 수량 증가
+const increaseQuantity = (index: number) => {
+  cartItems.value[index].quantity += 1;
+};
+
+// 장바구니에서 아이템 수량 감소
+const decreaseQuantity = (index: number) => {
+  if (cartItems.value[index].quantity > 1) {
+    cartItems.value[index].quantity -= 1;
+  }
+};
+
+// 장바구니에서 아이템 삭제
+const removeFromCart = (index: number) => {
+  cartItems.value.splice(index, 1);
+};
+
+// 장바구니 비우기
+const clearCart = () => {
+  cartItems.value = [];
+};
+
+// 총 주문 금액 계산
+const totalAmount = computed(() => {
+  return cartItems.value.reduce((total, cartItem) => {
+    return total + (cartItem.item.price * cartItem.quantity);
+  }, 0);
+});
+
+// 주문하기
+const placeOrder = () => {
+  if (cartItems.value.length === 0) {
+    alert('장바구니가 비어있습니다.');
+    return;
+  }
+  
+  // 여기에 주문 처리 로직 추가
+  alert('주문이 완료되었습니다!');
+  clearCart();
+};
+
+// 카테고리가 변경될 때마다 메뉴 아이템 업데이트 및 페이지 초기화
 watch(() => selectedCategory.value, async (newCategoryId) => {
   if (newCategoryId) {
     await loadMenuItems(newCategoryId);
+    currentPage.value = 1; // 카테고리 변경 시 첫 페이지로 이동
   }
 });
 
@@ -92,10 +181,96 @@ onMounted(async () => {
 					이 카테고리에 메뉴가 없습니다.
 				</div>
 				<div v-else class="menu-grid">
-					<div v-for="item in menuItems" :key="item.id" class="menu-item">
+					<div v-for="item in paginatedMenuItems" :key="item.id" class="menu-item" @click="addToCart(item)">
 						<img :src="`http://localhost:8080${item.image_url}`" :alt="item.name" />
 						<div class="menu-name">{{ item.name }}</div>
 						<div class="menu-price">{{ item.price }}원</div>
+					</div>
+				</div>
+				
+				<!-- 페이지네이션 컨트롤 -->
+				<div v-if="menuItems.length > itemsPerPage" class="pagination-controls">
+					<button 
+						class="pagination-btn" 
+						:disabled="currentPage === 1" 
+						@click="prevPage"
+					>
+						&lt;
+					</button>
+					
+					<div class="pagination-pages">
+						<button 
+							v-for="page in totalPages" 
+							:key="page" 
+							:class="['page-btn', { active: currentPage === page }]"
+							@click="changePage(page)"
+						>
+							{{ page }}
+						</button>
+					</div>
+					
+					<button 
+						class="pagination-btn" 
+						:disabled="currentPage === totalPages" 
+						@click="nextPage"
+					>
+						&gt;
+					</button>
+				</div>
+			</section>
+
+			<!-- 장바구니 영역 -->
+			<section class="cart-section">
+				<div class="cart-row">
+					<div class="cart-container">
+						<h2 class="cart-title">장바구니</h2>
+						
+						<div v-if="cartItems.length === 0" class="empty-cart">
+							장바구니가 비어있습니다.
+						</div>
+						
+						<div v-else class="cart-items">
+							<div v-for="(cartItem, index) in cartItems" :key="index" class="cart-item">
+								<div class="cart-item-info">
+									<div class="cart-item-name">{{ cartItem.item.name }}</div>
+									<div class="cart-item-price">{{ cartItem.item.price }}원</div>
+								</div>
+								
+								<div class="cart-item-actions">
+									<div class="quantity-control">
+										<button class="quantity-btn minus-btn" @click.stop="decreaseQuantity(index)">
+											<span class="material-icon">remove</span>
+										</button>
+										<span class="quantity">{{ cartItem.quantity }}</span>
+										<button class="quantity-btn plus-btn" @click.stop="increaseQuantity(index)">
+											<span class="material-icon">add</span>
+										</button>
+									</div>
+									<button class="remove-btn" @click.stop="removeFromCart(index)">
+										<span class="material-icon">delete</span>
+									</button>
+								</div>
+							</div>
+						</div>
+					</div>
+					
+					<div class="summary-container">
+						<div class="cart-summary">
+							<div class="cart-total">
+								<span>총 금액:</span>
+								<span class="total-amount">{{ totalAmount.toLocaleString() }}원</span>
+							</div>
+							<div class="cart-actions">
+								<button class="clear-cart-btn" @click="clearCart">
+									<span class="material-icon mr-1">delete_sweep</span>
+									전체 삭제
+								</button>
+								<button class="order-btn" @click="placeOrder">
+									<span class="material-icon mr-1">shopping_cart_checkout</span>
+									주문하기
+								</button>
+							</div>
+						</div>
 					</div>
 				</div>
 			</section>
@@ -107,6 +282,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+
 .order-view-container {
   height: 100%;
   width: 100%;
@@ -121,7 +298,7 @@ onMounted(async () => {
 	/* max-width: 1200px; */
 	margin: 0 auto;
 	border-radius: 10px;
-	overflow: hidden;
+	/* overflow: hidden; */
 	box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 	font-family: 'Noto Sans KR', sans-serif;
 	position: relative;
@@ -155,6 +332,7 @@ onMounted(async () => {
 .menu-list {
 	padding: 16px;
 	width: 100%;
+	height: auto;
 }
 
 .menu-grid {
@@ -175,6 +353,9 @@ onMounted(async () => {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	max-width: 300px;
+	margin: 0 auto;
+	width: 100%;
 }
 
 .menu-item:hover {
@@ -264,6 +445,264 @@ onMounted(async () => {
 	text-align: center;
 	color: #666;
 	font-size: 1.1rem;
+}
+
+.cart-section {
+  background: #f8f9fa;
+  border-top: 1px solid #eee;
+  padding: 16px;
+  margin-top: auto;
+  height: auto;
+}
+
+.cart-row {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+}
+
+.cart-container {
+  flex: 2;
+}
+
+.summary-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+	height: 100%;
+}
+
+.cart-title {
+  font-size: 1.2rem;
+  margin-bottom: 12px;
+  font-weight: bold;
+}
+
+.empty-cart {
+  text-align: center;
+  color: #888;
+  padding: 12px;
+  height: 144px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 144px;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.cart-items::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  min-height: 40px;
+}
+
+.cart-item:hover {
+  box-shadow: 0 4px 12px rgba(255,111,65,0.12);
+}
+
+.cart-item-info {
+  flex: 1;
+}
+
+.cart-item-name {
+  font-weight: 500;
+}
+
+.cart-item-price {
+  color: var(--button-primary);
+  font-size: 0.9rem;
+}
+
+.cart-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.quantity-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quantity-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--button-primary);
+  transition: background-color 0.2s;
+}
+
+.quantity-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.quantity-btn.minus-btn {
+  font-size: 18px;
+}
+
+.quantity-btn.plus-btn {
+  font-size: 18px;
+}
+
+.material-icon {
+  font-family: 'Material Icons';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.quantity {
+  min-width: 20px;
+  text-align: center;
+}
+
+.remove-btn {
+  background: transparent;
+  border: none;
+  color: var(--button-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.remove-btn:hover {
+  color: #ff5252;
+}
+
+.cart-summary {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.cart-total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 12px;
+}
+
+.total-amount {
+  color: var(--button-primary);
+  font-size: 1.1rem;
+}
+
+.cart-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clear-cart-btn, .order-btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mr-1 {
+  margin-right: 4px;
+}
+
+.clear-cart-btn {
+  background: #f1f1f1;
+  color: #555;
+}
+
+.order-btn {
+  background: var(--button-primary);
+  color: white;
+}
+
+.order-btn:hover {
+  opacity: 0.9;
+}
+
+/* 페이지네이션 스타일 */
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+  gap: 10px;
+}
+
+.pagination-btn {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-pages {
+  display: flex;
+  gap: 5px;
+}
+
+.page-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+}
+
+.page-btn.active {
+  background: var(--button-primary);
+  color: white;
+  border-color: var(--button-primary);
 }
 
 /* Responsive layout */
