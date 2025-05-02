@@ -2,10 +2,16 @@ package routes
 
 import (
     "github.com/gin-gonic/gin"
+    "github.com/gin-contrib/cors"
     "kiosk/handlers"
 )
 
 func SetupRoutes(r *gin.Engine) {
+    r.Use(cors.New(cors.Config{
+        AllowAllOrigins:  true,
+        AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+        AllowHeaders:     []string{"Origin", "Content-Type"},
+    }))
     api := r.Group("/api")
     {
         // 카테고리 관련

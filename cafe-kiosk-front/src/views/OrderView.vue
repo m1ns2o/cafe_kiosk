@@ -1,51 +1,98 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue';
+import { CategoryAPI } from '../api/menu';
+import type { MenuItem, Category } from '../types/menuType';
 
-const activeTab = ref('hot')
-const remainingTime = ref(300)
-const menuItems = ref([
-  {
-    id: 1,
-    name: '아메리카노',
-    price: 3000,
-    image: 'https://via.placeholder.com/100x120'
-  },
-  {
-    id: 2,
-    name: '카페라떼',
-    price: 4000,
-    image: 'https://via.placeholder.com/100x120'
-  },
-  {
-    id: 3,
-    name: '카푸치노',
-    price: 4500,
-    image: 'https://via.placeholder.com/100x120'
+const menuItems = ref<MenuItem[]>([]);
+const selectedCategory = ref<number>(0);
+const categories = ref<Category[]>([]);
+const isLoading = ref<boolean>(true);
+const error = ref<string | null>(null);
+
+// 카테고리가 변경되면 해당 카테고리의 메뉴를 불러오는 함수
+const loadMenuItems = async (categoryId: number) => {
+  if (!categoryId) return;
+  
+  try {
+    isLoading.value = true;
+    error.value = null;
+    const menuResponse = await CategoryAPI.getMenus(categoryId);
+    menuItems.value = menuResponse.data;
+    console.log('메뉴 아이템 로드:', menuItems.value);
+  } catch (err) {
+    console.error('메뉴를 불러오는 중 오류가 발생했습니다:', err);
+    error.value = '메뉴를 불러오는 중 오류가 발생했습니다.';
+    menuItems.value = [];
+  } finally {
+    isLoading.value = false;
   }
-])
+};
+
+// 카테고리가 변경될 때마다 메뉴 아이템 업데이트
+watch(() => selectedCategory.value, async (newCategoryId) => {
+  if (newCategoryId) {
+    await loadMenuItems(newCategoryId);
+  }
+});
+
+onMounted(async () => {
+  try {
+    isLoading.value = true;
+    error.value = null;
+    
+    // 카테고리 불러오기
+    const response = await CategoryAPI.getAllCategories();
+    categories.value = response.data;
+    console.log('카테고리 로드:', categories.value);
+    
+    // 첫 번째 카테고리를 기본값으로 설정
+    if (categories.value.length > 0) {
+      selectedCategory.value = categories.value[0].id;
+      // 초기 메뉴 아이템 로드
+      await loadMenuItems(selectedCategory.value);
+    }
+  } catch (err) {
+    console.error('카테고리를 불러오는 중 오류가 발생했습니다:', err);
+    error.value = '카테고리를 불러오는 중 오류가 발생했습니다.';
+    categories.value = [];
+  } finally {
+    isLoading.value = false;
+  }
+});
 </script>
 
 <template>
 	<div class="order-view-container">
 		<div class="order-view">
-			<!-- 상단 바 -->
-			<header class="header">
-				<span class="icon home"></span>
-				<span class="title">Easy KIOSK</span>
-				<span class="icon settings"></span>
-			</header>
+			<!-- 오류 메시지 표시 -->
+			<div v-if="error" class="error-message">
+				{{ error }}
+			</div>
+
+			<!-- 로딩 표시 -->
+			<div v-if="isLoading" class="loading">
+				데이터를 불러오는 중...
+			</div>
 
 			<!-- 카테고리 탭 -->
-			<nav class="category-tabs">
-				<button :class="{ active: activeTab === 'season' }" @click="activeTab = 'season'">시즌 메뉴</button>
-				<button :class="{ active: activeTab === 'hot' }" @click="activeTab = 'hot'">커피(HOT)</button>
-				<button :class="{ active: activeTab === 'ice' }" @click="activeTab = 'ice'">커피(ICE)</button>
+			<nav v-if="!isLoading && categories.length > 0" class="category-tabs">
+				<button 
+          v-for="category in categories" 
+          :key="category.id"
+          :class="{ active: selectedCategory === category.id }"
+          @click="selectedCategory = category.id"
+        >
+          {{ category.name }}
+        </button>
 			</nav>
 
 			<!-- 메뉴 리스트 -->
-			<section class="menu-list">
-				<div v-for="item in menuItems" :key="item.id" class="menu-item">
-					<img :src="item.image" :alt="item.name" />
+			<section v-if="!isLoading && !error" class="menu-list">
+				<div v-if="menuItems.length === 0" class="empty-menu">
+					이 카테고리에 메뉴가 없습니다.
+				</div>
+				<div v-else v-for="item in menuItems" :key="item.id" class="menu-item">
+					<img :src="item.image_url || '/placeholder.png'" :alt="item.name" />
 					<div class="menu-name">{{ item.name }}</div>
 					<div class="menu-price">{{ item.price }}원</div>
 				</div>
@@ -53,9 +100,6 @@ const menuItems = ref([
 
 			<!-- 주문/결제 영역 -->
 			<aside class="order-panel">
-				<div class="timer">
-					남은시간 <span class="time">{{ remainingTime }}</span>초
-				</div>
 				<button class="clear-btn">전체삭제</button>
 				<div class="selected-title">선택한 상품</div>
 				<div class="selected-items">
@@ -213,5 +257,31 @@ const menuItems = ref([
 	border-radius: 6px;
 	padding: 8px;
 	margin-bottom: 8px;
+}
+
+.loading {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	padding: 2rem;
+	font-size: 1.1rem;
+	color: #666;
+}
+
+.error-message {
+	background-color: #ffebee;
+	color: #c62828;
+	padding: 1rem;
+	margin: 1rem;
+	border-radius: 4px;
+	text-align: center;
+}
+
+.empty-menu {
+	width: 100%;
+	padding: 2rem;
+	text-align: center;
+	color: #666;
+	font-size: 1.1rem;
 }
 </style>
