@@ -6,7 +6,7 @@ import type { MenuItem, Category } from '../types/menuType';
 const menuItems = ref<MenuItem[]>([]);
 const selectedCategory = ref<number>(0);
 const categories = ref<Category[]>([]);
-const isLoading = ref<boolean>(true);
+// const isLoading = ref<boolean>(true);
 const error = ref<string | null>(null);
 
 // 카테고리가 변경되면 해당 카테고리의 메뉴를 불러오는 함수
@@ -14,7 +14,7 @@ const loadMenuItems = async (categoryId: number) => {
   if (!categoryId) return;
   
   try {
-    isLoading.value = true;
+    // isLoading.value = true;
     error.value = null;
     const menuResponse = await CategoryAPI.getMenus(categoryId);
     menuItems.value = menuResponse.data;
@@ -24,7 +24,7 @@ const loadMenuItems = async (categoryId: number) => {
     error.value = '메뉴를 불러오는 중 오류가 발생했습니다.';
     menuItems.value = [];
   } finally {
-    isLoading.value = false;
+    // isLoading.value = false;
   }
 };
 
@@ -37,7 +37,7 @@ watch(() => selectedCategory.value, async (newCategoryId) => {
 
 onMounted(async () => {
   try {
-    isLoading.value = true;
+    // isLoading.value = true;
     error.value = null;
     
     // 카테고리 불러오기
@@ -56,7 +56,7 @@ onMounted(async () => {
     error.value = '카테고리를 불러오는 중 오류가 발생했습니다.';
     categories.value = [];
   } finally {
-    isLoading.value = false;
+    // isLoading.value = false;
   }
 });
 </script>
@@ -70,12 +70,12 @@ onMounted(async () => {
 			</div>
 
 			<!-- 로딩 표시 -->
-			<div v-if="isLoading" class="loading">
+			<!-- <div v-if="isLoading" class="loading">
 				데이터를 불러오는 중...
-			</div>
+			</div> -->
 
 			<!-- 카테고리 탭 -->
-			<nav v-if="!isLoading && categories.length > 0" class="category-tabs">
+			<nav class="category-tabs">
 				<button 
           v-for="category in categories" 
           :key="category.id"
@@ -87,26 +87,21 @@ onMounted(async () => {
 			</nav>
 
 			<!-- 메뉴 리스트 -->
-			<section v-if="!isLoading && !error" class="menu-list">
+			<section class="menu-list">
 				<div v-if="menuItems.length === 0" class="empty-menu">
 					이 카테고리에 메뉴가 없습니다.
 				</div>
-				<div v-else v-for="item in menuItems" :key="item.id" class="menu-item">
-					<img :src="item.image_url || '/placeholder.png'" :alt="item.name" />
-					<div class="menu-name">{{ item.name }}</div>
-					<div class="menu-price">{{ item.price }}원</div>
+				<div v-else class="menu-grid">
+					<div v-for="item in menuItems" :key="item.id" class="menu-item">
+						<img :src="`http://localhost:8080${item.image_url}`" :alt="item.name" />
+						<div class="menu-name">{{ item.name }}</div>
+						<div class="menu-price">{{ item.price }}원</div>
+					</div>
 				</div>
 			</section>
 
 			<!-- 주문/결제 영역 -->
-			<aside class="order-panel">
-				<button class="clear-btn">전체삭제</button>
-				<div class="selected-title">선택한 상품</div>
-				<div class="selected-items">
-					<!-- 선택된 상품 리스트 -->
-				</div>
-				<button class="pay-btn">결제하기</button>
-			</aside>
+			
 		</div>
 	</div>
 </template>
@@ -120,7 +115,7 @@ onMounted(async () => {
 }
 
 .order-view {
-	background: #fff;
+	background: var(--background-primary);
 	width: 100%;
 	height: 100%;
 	/* max-width: 1200px; */
@@ -134,15 +129,6 @@ onMounted(async () => {
 	flex-direction: column;
 }
 
-.header {
-	background: #ff6f41;
-	color: #fff;
-	display: flex;
-	align-items: center;
-	padding: 16px;
-	font-size: 1.5rem;
-	justify-content: space-between;
-}
 
 .category-tabs {
 	display: flex;
@@ -161,28 +147,34 @@ onMounted(async () => {
 
 .category-tabs .active {
 	background: #fff;
-	border-bottom: 2px solid #ff6f41;
-	color: #ff6f41;
+	border-bottom: 2px solid var(--button-primary);
+	color: var(--button-primary);
 	font-weight: bold;
 }
 
 .menu-list {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 16px;
 	padding: 16px;
-	justify-content: space-between;
+	width: 100%;
+}
+
+.menu-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 16px;
+	width: 100%;
 }
 
 .menu-item {
-	width: 180px;
-	background: #fafafa;
-	border-radius: 8px;
+	background: white;
+	border-radius: 12px;
 	text-align: center;
-	padding: 12px;
+	padding: 20px;
 	box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 	cursor: pointer;
 	transition: box-shadow 0.2s;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
 }
 
 .menu-item:hover {
@@ -190,10 +182,10 @@ onMounted(async () => {
 }
 
 .menu-item img {
-	width: 100px;
-	height: 120px;
-	object-fit: contain;
 	margin-bottom: 8px;
+	width: 100%; 
+	aspect-ratio: 1 / 1; 
+	object-fit: contain; 
 }
 
 .menu-name {
@@ -202,7 +194,7 @@ onMounted(async () => {
 }
 
 .menu-price {
-	color: #ff6f41;
+	color: var(--button-primary);
 	font-weight: bold;
 }
 
@@ -220,19 +212,8 @@ onMounted(async () => {
 	gap: 8px;
 }
 
-.timer {
-	color: #333;
-	font-size: 1.1rem;
-}
-
-.time {
-	color: #ff6f41;
-	font-weight: bold;
-	font-size: 1.2rem;
-}
-
 .clear-btn, .pay-btn {
-	background: #444;
+	background: var(--button-primary);
 	color: #fff;
 	border: none;
 	border-radius: 6px;
@@ -242,7 +223,7 @@ onMounted(async () => {
 }
 
 .pay-btn {
-	background: #ff6f41;
+	background: var(--button-primary);
 	margin-top: 12px;
 }
 
@@ -283,5 +264,18 @@ onMounted(async () => {
 	text-align: center;
 	color: #666;
 	font-size: 1.1rem;
+}
+
+/* Responsive layout */
+@media (max-width: 768px) {
+  .menu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .menu-grid {
+    grid-template-columns: repeat(1, 1fr);
+  }
 }
 </style>
