@@ -2,6 +2,9 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import { CategoryAPI } from '../api/menu';
 import type { MenuItem, Category } from '../types/menuType';
+import { useRouter } from 'vue-router'; // 라우터 추가
+
+const router = useRouter(); // 라우터 인스턴스 생성
 
 const menuItems = ref<MenuItem[]>([]);
 const selectedCategory = ref<number>(0);
@@ -111,9 +114,14 @@ const placeOrder = () => {
     return;
   }
   
-  // 여기에 주문 처리 로직 추가
-  alert('주문이 완료되었습니다!');
-  clearCart();
+  // 라우터로 결제 페이지로 이동하면서 장바구니 데이터와 총액 전달
+  router.push({
+    name: 'PaymentView',
+    params: {
+      totalAmount: totalAmount.value.toString(),
+      cartItems: encodeURIComponent(JSON.stringify(cartItems.value))
+    }
+  });
 };
 
 // 카테고리가 변경될 때마다 메뉴 아이템 업데이트 및 페이지 초기화
@@ -396,32 +404,6 @@ onMounted(async () => {
   color: var(--button-primary);
   font-weight: bold;
   font-size: 0.9rem; /* 폰트 크기 줄임 */
-}
-
-.loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 1rem;
-  font-size: 1rem;
-  color: #666;
-}
-
-.error-message {
-  background-color: #ffebee;
-  color: #c62828;
-  padding: 0.75rem;
-  margin: 0.75rem;
-  border-radius: 4px;
-  text-align: center;
-}
-
-.empty-menu {
-  width: 100%;
-  padding: 1.5rem;
-  text-align: center;
-  color: #666;
-  font-size: 1rem;
 }
 
 .cart-section {
