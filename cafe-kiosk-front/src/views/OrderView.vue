@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue';
 import { CategoryAPI } from '../api/menu';
-import type { MenuItem, Category } from '../types/menuType';
+import type { MenuItem, Category, CartItem } from '../types/menuType';
 import { useRouter } from 'vue-router'; // 라우터 추가
 
 const router = useRouter(); // 라우터 인스턴스 생성
@@ -11,7 +11,7 @@ const selectedCategory = ref<number>(0);
 const categories = ref<Category[]>([]);
 // const isLoading = ref<boolean>(true);
 const error = ref<string | null>(null);
-const cartItems = ref<{item: MenuItem, quantity: number}[]>([]);
+const cartItems = ref<CartItem[]>([]);
 
 // 페이지네이션 관련 변수
 const currentPage = ref(1);

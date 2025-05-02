@@ -14,3 +14,14 @@ export interface Category {
   created_at: string;
   updated_at: string;
 }
+
+export interface CartItem {
+  item: MenuItem;
+  quantity: number;
+}
+
+export interface OrderData {
+  items: CartItem[];
+  totalAmount: number;
+  paymentDate: string;
+}

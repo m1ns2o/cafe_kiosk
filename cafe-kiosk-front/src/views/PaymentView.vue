@@ -2,10 +2,11 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { PaymentAPI } from '../api/payment';
+import type { CartItem } from '../types/menuType';
 import QRCode from 'qrcode';
 
 const route = useRoute();
-// const router = useRouter();
+const router = useRouter(); // 라우터 활성화
 
 // 결제 상태
 const paymentStatus = ref<'pending' | 'success' | 'failed'>('pending');
@@ -16,6 +17,27 @@ const paymentDetails = ref<any>(null);
 const qrCodeDataUrl = ref<string>('');
 const totalAmount = ref<number>(0);
 
+// 결제 재시도
+const retryPayment = async () => {
+  paymentStatus.value = 'pending';
+  statusMessage.value = '결제를 다시 시도 중입니다...';
+  paymentDetails.value = null;
+  await requestPayment();
+};
+
+// 주문 데이터를 백엔드로 전송
+const submitOrderToBackend = async () => {
+  try {
+    // 백엔드로 주문 데이터 전송
+    await PaymentAPI.postOrder(cartItems.value);
+    console.log('주문 데이터가 성공적으로 전송되었습니다.');
+    return true;
+  } catch (error) {
+    console.error('주문 데이터 전송 중 오류 발생:', error);
+    return false;
+  }
+};
+
 // 결제 요청 및 결과 확인
 const requestPayment = async () => {
   try {
@@ -24,6 +46,14 @@ const requestPayment = async () => {
     if (response.data.success) {
       paymentStatus.value = 'success';
       statusMessage.value = '결제가 완료되었습니다!';
+      
+      // 결제 성공 시 주문 데이터를 백엔드로 전송
+      await submitOrderToBackend();
+      
+      // 성공 페이지로 이동 (지연 추가)
+      setTimeout(() => {
+        router.push({ name: 'PaymentSuccessView' });
+      }, 1500);
     } else {
       paymentStatus.value = 'failed';
       statusMessage.value = response.data.message || '결제에 실패했습니다.';
@@ -71,7 +101,7 @@ const generateQRCode = async () => {
 };
 
 // 주문 정보
-const cartItems = computed(() => {
+const cartItems = computed<CartItem[]>(() => {
   if (!route.params.cartItems) return [];
   try {
     const decodedData = decodeURIComponent(route.params.cartItems as string);
@@ -135,6 +165,13 @@ onMounted(async () => {
             <span v-else class="material-icon">error</span>
           </div>
           <div class="status-message">{{ statusMessage }}</div>
+          
+          <!-- 결제 실패 시 재시도 버튼 표시 -->
+          <button v-if="paymentStatus === 'failed'" class="retry-btn" @click="retryPayment">
+            <span class="material-icon mr-1">refresh</span>
+            결제 재시도
+          </button>
+          
           <div v-if="paymentDetails && paymentStatus === 'failed'" class="payment-details">
             <p>예상 금액: {{ paymentDetails.expected_amount.toLocaleString() }}원</p>
             <p>실제 변동액: {{ paymentDetails.actual_change.toLocaleString() }}원</p>
@@ -370,7 +407,7 @@ onMounted(async () => {
   margin-top: 30px;
 }
 
-.cancel-btn, .home-btn {
+.cancel-btn, .home-btn, .retry-btn {
   padding: 10px 20px;
   border-radius: 8px;
   border: none;
@@ -393,11 +430,17 @@ onMounted(async () => {
   color: white;
 }
 
+.retry-btn {
+  background-color: #2196f3;
+  color: white;
+  margin-top: 10px;
+}
+
 .cancel-btn:hover {
   background-color: #e5e5e5;
 }
 
-.home-btn:hover {
+.home-btn:hover, .retry-btn:hover {
   opacity: 0.9;
 }
 
@@ -438,7 +481,7 @@ onMounted(async () => {
     flex-direction: column;
   }
   
-  .cancel-btn, .home-btn {
+  .cancel-btn, .home-btn, .retry-btn {
     width: 100%;
   }
 }
