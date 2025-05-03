@@ -3,6 +3,7 @@ import Home from '../views/Home.vue'
 import About from '../views/About.vue'
 import OrderView from '../views/OrderView.vue'
 import PaymentView from '../views/PaymentView.vue'
+import PaymentSuccessView from '../views/PaymentSuccessView.vue'
 
 const routes = [
   {
@@ -24,6 +25,11 @@ const routes = [
     path: '/payment/:totalAmount/:cartItems',
     name: 'PaymentView',
     component: PaymentView
+  },
+  {
+    path: '/success',
+    name: 'PaymentSuccessView',
+    component: PaymentSuccessView 
   }
 ]
 

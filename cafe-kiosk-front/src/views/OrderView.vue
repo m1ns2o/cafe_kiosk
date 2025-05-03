@@ -295,7 +295,7 @@ onMounted(async () => {
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
 
 .order-view-container {
-  height: 100vh; /* 뷰포트 높이 사용 */
+  height: 100%; /* Using 100% instead of 100vh */
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -321,6 +321,7 @@ onMounted(async () => {
   background: #f6f6f6;
   border-bottom: 1px solid #eee;
   min-height: 46px; /* 최소 높이 설정 */
+  flex-shrink: 0; /* Prevent tabs from shrinking */
 }
 
 .category-tabs button {
@@ -343,7 +344,7 @@ onMounted(async () => {
   padding: 12px; /* 패딩 줄임 */
   width: 100%;
   flex: 1; /* 남은 공간 차지 */
-  overflow-y: none; /* 수직 스크롤 추가 */
+  overflow-y: auto; /* Enable vertical scrolling */
   display: flex;
   flex-direction: column;
 }
@@ -370,9 +371,10 @@ onMounted(async () => {
   max-width: 300px;
   margin: 0 auto;
   width: 100%;
-	/* height: auto; */
-	max-height: 340px;
-  min-height: 0; /* 높이 자동 조절 */
+  /* Calculate height based on available space */
+  height: calc((100vh - 46px - 25vh - 60px) / 2); /* 46px for tabs, 25vh for cart, 60px for other padding/margins */
+  max-height: 340px; /* Maximum height limit */
+  min-height: 180px; /* Minimum height */
 }
 
 .menu-item:hover {
@@ -382,10 +384,13 @@ onMounted(async () => {
 /* 이미지 컨테이너 추가 */
 .menu-image-container {
   width: 100%;
+  height: 65%; /* Percentage of the menu item height */
   margin-bottom: 8px;
-  aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .menu-item img {
@@ -398,14 +403,20 @@ onMounted(async () => {
   font-size: 0.9rem; /* 폰트 크기 줄임 */
   margin: 2px 0; /* 마진 줄임 */
   line-height: 1.2;
+  /* Ensure text doesn't overflow */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menu-price {
   color: var(--button-primary);
   font-weight: bold;
   font-size: 0.9rem; /* 폰트 크기 줄임 */
+  margin-top: auto; /* Push to bottom of flex container */
 }
 
+/* 카트 영역은 원래 CSS 유지 */
 .cart-section {
   background: #f8f9fa;
   border-top: 1px solid #eee;
@@ -687,11 +698,49 @@ onMounted(async () => {
   .cart-section {
     max-height: 40vh;
   }
+  
+  .menu-item {
+    /* Recalculate for 2 columns layout */
+    height: calc((100vh - 46px - 40vh - 60px) / 3);
+  }
 }
 
 @media (max-width: 480px) {
   .menu-grid {
     grid-template-columns: repeat(1, 1fr);
+  }
+  
+  .menu-item {
+    /* Recalculate for 1 column layout */
+    height: calc((100vh - 46px - 40vh - 60px) / 3);
+    max-height: 280px;
+  }
+}
+
+/* Add height-based media queries */
+@media (max-height: 800px) {
+  .menu-item {
+    height: calc((100vh - 46px - 25vh - 50px) / 2);
+  }
+}
+
+@media (max-height: 600px) {
+  .menu-item {
+    height: calc((100vh - 46px - 25vh - 40px) / 2);
+    min-height: 150px;
+  }
+  
+  .category-tabs button {
+    padding: 6px;
+    font-size: 0.9rem;
+  }
+  
+  .menu-name {
+    font-size: 0.8rem;
+  }
+  
+  .menu-price {
+    font-size: 0.8rem;
   }
 }
 </style>

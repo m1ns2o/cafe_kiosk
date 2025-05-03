@@ -6,7 +6,7 @@
           <div class="status-icon">
             <span class="material-icon">check_circle</span>
           </div>
-          <div class="status-message">결제가 성공했습니다!</div>
+          <div class="status-message">결제에 성공했습니다!</div>
           <div class="status-description">잠시만 기다려주세요. 주문 페이지로 이동합니다.</div>
           <div class="countdown">{{ countdown }}초 후 이동</div>
         </div>
@@ -40,18 +40,24 @@ onMounted(() => {
   flex-direction: column;
   min-height: 100vh;
   background-color: var(--background-primary, #f5f5f5);
-  padding: 20px;
+  /* padding: 20px; */
+  display: flex;
+  justify-content: center;
 }
 
-.payment-success {
+/* .payment-success {
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
+  height: 100%;
   background-color: white;
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 20px;
-}
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+} */
 
 .payment-info {
   display: flex;
@@ -65,7 +71,7 @@ onMounted(() => {
   align-items: center;
   padding: 40px 15px;
   border-radius: 8px;
-  background-color: #e6f7e6;
+  /* background-color: #e6f7e6; */
   margin-top: 10px;
   text-align: center;
 }
@@ -109,8 +115,8 @@ onMounted(() => {
 .countdown {
   font-size: 1.4rem;
   font-weight: 500;
-  color: var(--button-primary, #4caf50);
-  background-color: rgba(76, 175, 80, 0.1);
+  color: var(--button-text);
+  background-color: var(--button-primary);
   padding: 10px 20px;
   border-radius: 30px;
   margin-top: 10px;

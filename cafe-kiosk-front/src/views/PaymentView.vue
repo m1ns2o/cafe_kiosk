@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { PaymentAPI } from '../api/payment';
 import type { CartItem } from '../types/menuType';
@@ -11,17 +11,22 @@ const router = useRouter(); // 라우터 활성화
 // 결제 상태
 const paymentStatus = ref<'pending' | 'success' | 'failed'>('pending');
 const statusMessage = ref<string>('결제를 진행 중입니다...');
-const paymentDetails = ref<any>(null);
+// const paymentDetails = ref<any>(null);
 
 // QR 코드 관련
 const qrCodeDataUrl = ref<string>('');
 const totalAmount = ref<number>(0);
 
+let redirectTimer: ReturnType<typeof setTimeout>;
+
+
 // 결제 재시도
 const retryPayment = async () => {
+  clearTimeout(redirectTimer);
+  console.log('clearTimeout');
   paymentStatus.value = 'pending';
   statusMessage.value = '결제를 다시 시도 중입니다...';
-  paymentDetails.value = null;
+  // paymentDetails.value = null;
   await requestPayment();
 };
 
@@ -53,18 +58,31 @@ const requestPayment = async () => {
       // 성공 페이지로 이동 (지연 추가)
       setTimeout(() => {
         router.push({ name: 'PaymentSuccessView' });
-      }, 1500);
+      }, 1000);
     } else {
       paymentStatus.value = 'failed';
       statusMessage.value = response.data.message || '결제에 실패했습니다.';
-      paymentDetails.value = response.data.details;
+      // paymentDetails.value = response.data.details;
+      redirectTimer = setTimeout(() => {
+        router.push({ name: 'OrderView' });
+      }, 5000);
     }
   } catch (error) {
     console.error('결제 요청 중 오류 발생:', error);
     paymentStatus.value = 'failed';
-    statusMessage.value = '결제 처리 중 오류가 발생했습니다.';
+    statusMessage.value = '결제에 실패했습니다.';
+    
+    redirectTimer = setTimeout(() => {
+        router.push({ name: 'OrderView' });
+      }, 5000);
   }
 };
+
+onBeforeUnmount(() => {
+  if (redirectTimer) {
+    clearTimeout(redirectTimer);
+  }
+});
 
 // QR 코드 생성
 const generateQRCode = async () => {
@@ -144,6 +162,8 @@ onMounted(async () => {
             <div v-else class="loading-qr">QR 코드 생성 중...</div>
           </div>
           <p class="qr-instruction">QR 코드를 스캔하여 결제를 진행해주세요.</p>
+          
+          <p class="account-instruction">토스 앱이 없다면 한국투자증권 6961147001로 입금해주세요</p>
         </div>
         
         <!-- 장바구니 아이템 표시 -->
@@ -180,23 +200,30 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-
 .payment-view-container {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  /* min-height: 100vh; */
+  height: 100%;
   background-color: var(--background-primary, #f5f5f5);
   padding: 20px;
+  overflow: hidden;
 }
 
 .payment-view {
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
+  height: 100%;
   background-color: white;
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  /* padding-bottom: 30%; */
+  overflow: hidden;
 }
 
 .payment-title {
@@ -212,6 +239,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  overflow-y: auto;
 }
 
 .amount-display {
@@ -272,7 +300,14 @@ onMounted(async () => {
   text-align: center;
   color: #666;
   font-size: 0.9rem;
-  max-width: 300px;
+}
+
+.account-instruction {
+  margin-top: 3px;
+  text-align: center;
+  color: #999;
+  font-size: 0.9rem;
+  /* max-width: 300px; */
 }
 
 /* 장바구니 요약 스타일 */
@@ -298,6 +333,7 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow-y: auto;
 }
 
 .cart-item-summary {
@@ -307,6 +343,7 @@ onMounted(async () => {
   background-color: white;
   border-radius: 4px;
   border: 1px solid #eee;
+  overflow: hidden;
 }
 
 .item-name {
@@ -444,6 +481,7 @@ onMounted(async () => {
   margin-right: 5px;
 }
 
+/* 반응형 스타일링 */
 @media (max-width: 768px) {
   .payment-view {
     padding: 15px;
@@ -479,6 +517,136 @@ onMounted(async () => {
   
   .cancel-btn, .home-btn, .retry-btn {
     width: 100%;
+  }
+}
+
+/* 새로운 height 기반 미디어 쿼리 추가 */
+@media (max-height: 800px) {
+  .qr-code {
+    width: 220px;
+    height: 220px;
+  }
+  
+  .cart-summary {
+    max-height: 18vh;
+  }
+  
+  .payment-status {
+    padding: 10px;
+  }
+  
+  .status-icon .material-icons {
+    font-size: 30px;
+  }
+  
+  .status-message {
+    font-size: 1rem;
+  }
+}
+
+@media (max-height: 700px) {
+  .qr-code {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .qr-instruction {
+    font-size: 0.8rem;
+    margin-bottom: 0;
+  }
+  
+  .cart-summary {
+    max-height: 15vh;
+    padding: 10px;
+  }
+  
+  .cart-summary h2 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+  }
+  
+  .amount-display {
+    padding: 10px;
+  }
+  
+  .amount-display h2 {
+    font-size: 1rem;
+    margin-bottom: 5px;
+  }
+  
+  .total-amount {
+    font-size: 1.5rem;
+  }
+  
+  .payment-status {
+    padding: 8px;
+  }
+  
+  .status-icon .material-icons {
+    font-size: 24px;
+    margin-bottom: 5px;
+  }
+  
+  .status-message {
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+  }
+}
+
+@media (max-height: 600px) {
+  .payment-info {
+    gap: 10px;
+  }
+  
+  .qr-code-container {
+    padding: 10px;
+  }
+  
+  .qr-code {
+    width: 150px;
+    height: 150px;
+    margin-bottom: 5px;
+  }
+  
+  .cart-summary {
+    max-height: 12vh;
+  }
+  
+  .cart-item-summary {
+    padding: 5px;
+  }
+  
+  .item-name, .item-quantity, .item-price {
+    font-size: 0.8rem;
+  }
+  
+  .retry-btn {
+    padding: 6px 12px;
+    font-size: 0.9rem;
+  }
+}
+
+/* 높이와 너비 모두를 고려한 미디어 쿼리 */
+@media (max-width: 480px) and (max-height: 700px) {
+  .qr-code {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .cart-summary {
+    max-height: 12vh;
+  }
+  
+  .payment-view-container {
+    padding: 5px;
+  }
+  
+  .payment-view {
+    padding: 10px;
+  }
+  
+  .amount-display, .payment-status {
+    padding: 8px;
   }
 }
 </style>
