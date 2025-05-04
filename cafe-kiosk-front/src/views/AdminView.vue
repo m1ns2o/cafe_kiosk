@@ -2,12 +2,12 @@
 	<div class="sidebar-container">
 		<!-- 사이드바 메뉴 -->
 		<el-menu
-			default-active="2"
+			default-active="1"
 			class="el-menu-vertical-demo"
 			:collapse="isCollapse"
 			@open="handleOpen"
 			@close="handleClose"
-			text-color="var(--text-primary)"
+			text-color="var(--nordic-icon-gray)"
 			active-text-color="var(--accent-color)"
 		>
 			<!-- 맨 위에 토글 버튼 추가 -->
@@ -29,17 +29,21 @@
 			</div>
 
 			<!-- 기존 메뉴 아이템들 -->
+			<el-menu-item index="1">
+				<el-icon><PieChart /></el-icon>
+				<template #title>Statistics</template>
+			</el-menu-item>
 			<el-menu-item index="2">
-				<el-icon><icon-menu /></el-icon>
-				<template #title>Navigator Two</template>
+				<el-icon><list /></el-icon>
+				<template #title>Category</template>
 			</el-menu-item>
 			<el-menu-item index="3">
-				<el-icon><document /></el-icon>
-				<template #title>Navigator Three</template>
+				<el-icon><Coffee /></el-icon>
+				<template #title>Menu</template>
 			</el-menu-item>
 			<el-menu-item index="4">
-				<el-icon><setting /></el-icon>
-				<template #title>Navigator Four</template>
+				<el-icon><Wallet /></el-icon>
+				<template #title>Order</template>
 			</el-menu-item>
 		</el-menu>
 	</div>
@@ -48,11 +52,13 @@
 <script lang="ts" setup>
 import { ref } from "vue";
 import {
-	Document,
 	Menu as IconMenu,
-	Setting,
 	DArrowRight,
 	DArrowLeft,
+	Coffee,
+	PieChart,
+	List,
+	Wallet,
 } from "@element-plus/icons-vue";
 
 const isCollapse = ref(true);
@@ -65,6 +71,12 @@ const handleClose = (key: string, keyPath: string[]) => {
 </script>
 
 <style>
+:root {
+	/* 추가된 적절한 그레이 색상 */
+	--nordic-icon-gray: #94a3b8; /* 중간 톤의 슬레이트 그레이 */
+	--nordic-icon-light-gray: #cbd5e1; /* 밝은 톤의 슬레이트 그레이 */
+}
+
 .sidebar-container {
 	display: flex;
 	flex-direction: column;
@@ -77,7 +89,7 @@ const handleClose = (key: string, keyPath: string[]) => {
 	display: flex;
 	align-items: center;
 	padding: 0;
-	color: var(--text-primary);
+	color: var(--nordic-icon-gray);
 	position: relative;
 }
 
@@ -122,10 +134,12 @@ const handleClose = (key: string, keyPath: string[]) => {
 	background-color: var(--nordic-light-blue) !important;
 }
 
+/* 선택되지 않은 메뉴 아이템의 아이콘 색상 변경 */
 .el-menu-item .el-icon {
-	color: var(--text-primary);
+	color: var(--nordic-icon-gray);
 }
 
+/* 활성화된 메뉴 아이템의 아이콘 색상 */
 .el-menu-item.is-active .el-icon {
 	color: var(--accent-color);
 }
