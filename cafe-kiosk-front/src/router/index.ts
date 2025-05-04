@@ -4,6 +4,7 @@ import About from '../views/About.vue'
 import OrderView from '../views/OrderView.vue'
 import PaymentView from '../views/PaymentView.vue'
 import PaymentSuccessView from '../views/PaymentSuccessView.vue'
+import AdminView from '../views/AdminView.vue'
 
 const routes = [
   {
@@ -30,6 +31,11 @@ const routes = [
     path: '/success',
     name: 'PaymentSuccessView',
     component: PaymentSuccessView 
+  },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: AdminView
   }
 ]
 
