@@ -24,5 +24,7 @@
   --button-primary: var(--nordic-pastel-blue);
   --button-text: var(--nordic-light-grey);
   --card-background: white;
+
+  --el-color-primary: var(--nordic-pastel-blue); /* 원하는 색상 코드로 변경 */
 }
 </style>

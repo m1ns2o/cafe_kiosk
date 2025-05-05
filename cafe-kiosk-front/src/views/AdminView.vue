@@ -129,16 +129,6 @@ onMounted(() => {
 	transition: margin-left 0.3s ease;
 }
 
-/* 사이드바가 접혔을 때 컨텐츠 영역 조정 */
-/* .sidebar-collapsed .content-container {
-	margin-left: 64px; 
-} */
-
-/* 사이드바가 펼쳐졌을 때 컨텐츠 영역 조정 */
-/* .layout-container:not(.sidebar-collapsed) .content-container {
-	margin-left: 200px; /
-} */
-
 .toggle-item {
 	height: 56px;
 	display: flex;

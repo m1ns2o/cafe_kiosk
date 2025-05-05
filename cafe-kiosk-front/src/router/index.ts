@@ -6,6 +6,7 @@ import PaymentView from '../views/PaymentView.vue'
 import PaymentSuccessView from '../views/PaymentSuccessView.vue'
 import AdminView from '../views/AdminView.vue'
 import CategoryView from '../views/AdminView/CategoryView.vue'
+import MenuView from '../views/AdminView/MenuView.vue'
 // import AdminDashboard from '../views/admin/AdminDashboard.vue'
 // import AdminStatistics from '../views/admin/AdminStatistics.vue'
 // import AdminCategory from '../views/admin/AdminCategory.vue'
@@ -59,11 +60,11 @@ const routes = [
         name: 'Category',
         component: CategoryView
       },
-      // {
-      //   path: 'menu', // /admin/menu
-      //   name: 'AdminMenu',
-      //   component: AdminMenu
-      // },
+      {
+        path: 'menu', // /admin/menu
+        name: 'AdminMenu',
+        component: MenuView
+      },
       // {
       //   path: 'order', // /admin/order
       //   name: 'AdminOrder',
