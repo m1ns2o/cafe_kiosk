@@ -1,15 +1,16 @@
 <template>
-  <div>
+  <div class="main">
     <el-table 
       ref="tableRef" 
       row-key="id" 
-      :data="tableData" 
-      style="width: 100%" 
+      :data="pagedTableData" 
       header-cell-class-name="table-header"
       v-loading="loading"
+      class="menu-table"
     >
+      <!-- 기존 테이블 컬럼들... -->
       <!-- 이미지 열 -->
-      <el-table-column label="이미지" width="100">
+      <el-table-column label="이미지" class-name="image-column" align="left">
         <template #default="scope">
           <div class="image-container">
             <img v-if="scope.row.image_url" 
@@ -22,7 +23,7 @@
       </el-table-column>
       
       <!-- 메뉴 이름 열 -->
-      <el-table-column prop="name" label="메뉴" width="180">
+      <el-table-column prop="name" label="메뉴" class-name="name-column" align="left">
         <template #default="scope">
           <el-popover effect="light" trigger="hover" placement="top" width="auto">
             <template #default>
@@ -38,7 +39,7 @@
       </el-table-column>
       
       <!-- 가격 열 -->
-      <el-table-column prop="price" label="가격" width="120">
+      <el-table-column prop="price" label="가격" class-name="price-column" align="left">
         <template #default="scope">
           <span>{{ formatPrice(scope.row.price) }}</span>
         </template>
@@ -48,7 +49,8 @@
       <el-table-column
         prop="category_id"
         label="카테고리"
-        width="150"
+        class-name="category-column"
+        align="left"
         :filters="categoryFilters"
         :filter-method="filterByCategory"
         filter-placement="bottom-end"
@@ -59,7 +61,7 @@
       </el-table-column>
       
       <!-- 작업 열 -->
-      <el-table-column label="" width="120">
+      <el-table-column label="" class-name="action-column" align="right">
         <template #default="scope">
           <div class="action-buttons">
             <el-icon 
@@ -78,11 +80,24 @@
         </template>
       </el-table-column>
     </el-table>
+    
+    <!-- 페이지네이션 추가 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        :page-size="pageSize"
+        layout="total, prev, pager, next"
+        :total="filteredTableData.length"
+        @current-change="handleCurrentChange"
+        :pager-count="5"
+        background
+      />
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { PictureRounded, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import type { TableInstance } from 'element-plus'
@@ -93,6 +108,35 @@ const tableRef = ref<TableInstance>()
 const tableData = ref<MenuItem[]>([])
 const categories = ref<Category[]>([])
 const loading = ref(false)
+
+// 페이지네이션 관련 변수
+const currentPage = ref(1)
+const pageSize = ref(8) // 페이지당 8개 항목
+
+// 필터링된 테이블 데이터 (카테고리 필터 적용)
+const filteredTableData = computed(() => {
+  if (!tableRef.value) return tableData.value
+  
+  // 테이블의 필터 상태를 확인하여 필터링된 데이터 반환
+  const filters = tableRef.value.filters
+  if (filters && Object.keys(filters).length > 0 && filters.category_id && filters.category_id.length > 0) {
+    return tableData.value.filter(row => filters.category_id.includes(row.category_id))
+  }
+  
+  return tableData.value
+})
+
+// 현재 페이지에 표시할 데이터
+const pagedTableData = computed(() => {
+  const startIndex = (currentPage.value - 1) * pageSize.value
+  const endIndex = startIndex + pageSize.value
+  return filteredTableData.value.slice(startIndex, endIndex)
+})
+
+// 필터 변경 시 첫 페이지로 돌아가기
+watch(() => filteredTableData.value.length, () => {
+  currentPage.value = 1
+})
 
 // 컴포넌트 마운트 시 데이터 로드
 onMounted(async () => {
@@ -134,6 +178,11 @@ const getCategoryName = (categoryId: number): string => {
 // 카테고리 필터링
 const filterByCategory = (value: number, row: MenuItem) => {
   return row.category_id === value
+}
+
+// 페이지 변경 처리
+const handleCurrentChange = (val: number) => {
+  currentPage.value = val
 }
 
 // 가격 포맷팅 (원화)
@@ -188,15 +237,28 @@ const deleteMenu = async (id: number) => {
 </script>
 
 <style scoped>
-.controls {
-  margin-bottom: 20px;
+.main {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.menu-table {
+  width: 85%;
+  margin-bottom: 10px;
+}
+
+.pagination-container {
+  margin-top: 20px;
+  margin-bottom: 30px;
 }
 
 .image-container {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   height: 50px;
 }
@@ -207,15 +269,62 @@ const deleteMenu = async (id: number) => {
   object-fit: contain;
 }
 
+/* 테이블 헤더와 셀 정렬 */
 .table-header {
-  text-align: center !important;
+  text-align: left !important;
   font-weight: bold;
+}
+
+:deep(.el-table__header-wrapper .el-table__header th) {
+  text-align: left !important;
+}
+
+/* 개선된 컬럼 너비 설정 - 백분율 기반 */
+:deep(.image-column) {
+  width: 100px !important;
+}
+
+:deep(.name-column) {
+  width: 35% !important; 
+}
+
+:deep(.price-column) {
+  width: 15% !important;
+}
+
+:deep(.category-column) {
+  width: 20% !important;
+}
+
+:deep(.action-column) {
+  width: 80px !important;
+}
+
+:deep(.el-table__row .image-column) {
+  text-align: left !important;
+}
+
+:deep(.el-table__row .name-column) {
+  text-align: left !important;
+}
+
+:deep(.el-table__row .price-column) {
+  text-align: left !important;
+}
+
+:deep(.el-table__row .category-column) {
+  text-align: left !important;
+}
+
+:deep(.el-table__row .action-column) {
+  text-align: right !important;
 }
 
 .action-buttons {
   display: flex;
-  justify-content: flex-start;
-  gap: 16px;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
 }
 
 .action-icon {
@@ -229,5 +338,169 @@ const deleteMenu = async (id: number) => {
 
 .delete-icon {
   color: #f56c6c; /* Element Plus danger color */
+}
+
+
+/* 미디어 쿼리 */
+@media screen and (min-width: 1201px) {
+  .menu-table {
+    width: 80%;
+    margin: 0 auto;
+  }
+  
+  :deep(.image-column) {
+    width: 100px !important;
+  }
+  
+  :deep(.name-column) {
+    width: 35% !important;
+  }
+  
+  :deep(.price-column) {
+    width: 15% !important;
+  }
+  
+  :deep(.category-column) {
+    width: 20% !important;
+  }
+  
+  :deep(.action-column) {
+    width: 80px !important;
+  }
+}
+
+@media screen and (min-width: 993px) and (max-width: 1200px) {
+  .menu-table {
+    width: 80%;
+    margin: 0 auto;
+  }
+  
+  :deep(.image-column) {
+    width: 90px !important;
+  }
+  
+  :deep(.name-column) {
+    width: 35% !important;
+  }
+  
+  :deep(.price-column) {
+    width: 15% !important;
+  }
+  
+  :deep(.category-column) {
+    width: 20% !important;
+  }
+  
+  :deep(.action-column) {
+    width: 80px !important;
+  }
+}
+
+@media screen and (min-width: 769px) and (max-width: 992px) {
+  .menu-table {
+    width: 80%;
+    margin: 0 auto;
+  }
+  
+  :deep(.image-column) {
+    width: 80px !important;
+  }
+  
+  :deep(.name-column) {
+    width: 35% !important;
+  }
+  
+  :deep(.price-column) {
+    width: 15% !important;
+  }
+  
+  :deep(.category-column) {
+    width: 20% !important;
+  }
+  
+  :deep(.action-column) {
+    width: 80px !important;
+  }
+}
+
+@media screen and (min-width: 577px) and (max-width: 768px) {
+  .menu-table {
+    width: 85%;
+    margin: 0 auto;
+  }
+  
+  :deep(.image-column) {
+    width: 70px !important;
+  }
+  
+  :deep(.name-column) {
+    width: 35% !important;
+  }
+  
+  :deep(.price-column) {
+    width: 15% !important;
+  }
+  
+  :deep(.category-column) {
+    width: 20% !important;
+  }
+  
+  :deep(.action-column) {
+    width: 70px !important;
+  }
+}
+
+@media screen and (min-width: 401px) and (max-width: 576px) {
+  .menu-table {
+    width: 90%;
+    margin: 0 auto;
+  }
+  
+  :deep(.image-column) {
+    width: 60px !important;
+  }
+  
+  :deep(.name-column) {
+    width: 35% !important;
+  }
+  
+  :deep(.price-column) {
+    width: 15% !important;
+  }
+  
+  :deep(.category-column) {
+    width: 20% !important;
+  }
+  
+  :deep(.action-column) {
+    width: 60px !important;
+  }
+}
+
+@media screen and (max-width: 400px) {
+  .menu-table {
+    width: 100%;
+    margin: 0 auto;
+  }
+  
+  :deep(.image-column) {
+    width: 55px !important;
+  }
+  
+  :deep(.name-column) {
+    width: 35% !important;
+  }
+  
+  :deep(.price-column) {
+    width: 15% !important;
+  }
+  
+  :deep(.category-column) {
+    width: 15% !important;
+  }
+  
+  :deep(.action-column) {
+    width: 55px !important;
+  }
 }
 </style>
