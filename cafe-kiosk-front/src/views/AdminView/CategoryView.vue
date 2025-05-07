@@ -8,58 +8,8 @@
       v-loading="loading"
       class="menu-table"
     >
-      <!-- 기존 테이블 컬럼들... -->
-      <!-- 이미지 열 -->
-      <el-table-column label="이미지" class-name="image-column" align="left">
-        <template #default="scope">
-          <div class="image-container">
-            <img v-if="scope.row.image_url" 
-                 :src="scope.row.image_url" 
-                 :alt="scope.row.name" 
-                 class="menu-image" />
-            <el-icon v-else><picture-rounded /></el-icon>
-          </div>
-        </template>
-      </el-table-column>
-      
       <!-- 메뉴 이름 열 -->
-      <el-table-column prop="name" label="메뉴" class-name="name-column" align="left">
-        <template #default="scope">
-          <el-popover effect="light" trigger="hover" placement="top" width="auto">
-            <template #default>
-              <div>이름: {{ scope.row.name }}</div>
-              <div>가격: {{ formatPrice(scope.row.price) }}</div>
-              <div>카테고리: {{ getCategoryName(scope.row.category_id) }}</div>
-            </template>
-            <template #reference>
-              <span>{{ scope.row.name }}</span>
-            </template>
-          </el-popover>
-        </template>
-      </el-table-column>
-      
-      <!-- 가격 열 -->
-      <el-table-column prop="price" label="가격" class-name="price-column" align="left">
-        <template #default="scope">
-          <span>{{ formatPrice(scope.row.price) }}</span>
-        </template>
-      </el-table-column>
-      
-      <!-- 카테고리 열 -->
-      <el-table-column
-        prop="category_id"
-        label="카테고리"
-        class-name="category-column"
-        align="left"
-        :filters="categoryFilters"
-        :filter-method="filterByCategory"
-        filter-placement="bottom-end"
-      >
-        <template #default="scope">
-          <span>{{ getCategoryName(scope.row.category_id) }}</span>
-        </template>
-      </el-table-column>
-      
+      <el-table-column prop="name" label="메뉴명" class-name="name-column" align="left" />
       <!-- 작업 열 -->
       <el-table-column label="" class-name="action-column" align="right">
         <template #default="scope">
@@ -72,7 +22,7 @@
             </el-icon>
             <el-icon
               class="action-icon delete-icon"
-              @click="confirmDelete(scope.row)"
+              @click="confirmDeleteCategory(scope.row)"
             >
               <Delete />
             </el-icon>
@@ -97,45 +47,29 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { PictureRounded, Edit, Delete } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import type { TableInstance } from 'element-plus'
-import { MenuAPI, CategoryAPI } from '../../api/menu'
-import type { MenuItem, Category } from '../../types/menuType'
+import { CategoryAPI } from '../../api/menu'
+import type { Category } from '../../types/menuType'
 
 const tableRef = ref<TableInstance>()
-const tableData = ref<MenuItem[]>([])
-const categories = ref<Category[]>([])
+const tableData = ref<Category[]>([])
 const loading = ref(false)
 
 // 페이지네이션 관련 변수
 const currentPage = ref(1)
 const pageSize = ref(8) // 페이지당 8개 항목
 
-// 필터링된 테이블 데이터 (카테고리 필터 적용)
-const filteredTableData = computed(() => {
-  if (!tableRef.value) return tableData.value
-  
-  // 테이블의 필터 상태를 확인하여 필터링된 데이터 반환
-  const filters = tableRef.value.filters
-  if (filters && Object.keys(filters).length > 0 && filters.category_id && filters.category_id.length > 0) {
-    return tableData.value.filter(row => filters.category_id.includes(row.category_id))
-  }
-  
-  return tableData.value
-})
+// 필터링된 테이블 데이터 
+const filteredTableData = computed(() => tableData.value )
 
 // 현재 페이지에 표시할 데이터
 const pagedTableData = computed(() => {
   const startIndex = (currentPage.value - 1) * pageSize.value
   const endIndex = startIndex + pageSize.value
   return filteredTableData.value.slice(startIndex, endIndex)
-})
-
-// 필터 변경 시 첫 페이지로 돌아가기
-watch(() => filteredTableData.value.length, () => {
-  currentPage.value = 1
 })
 
 // 컴포넌트 마운트 시 데이터 로드
@@ -145,39 +79,16 @@ onMounted(async () => {
 
 // API에서 데이터 가져오기
 const fetchData = async () => {
-  loading.value = true
+  loading.value = true;
   try {
-    const [menuResponse, categoryResponse] = await Promise.all([
-      MenuAPI.getMenus(),
-      CategoryAPI.getAllCategories()
-    ])
-    tableData.value = menuResponse.data
-    categories.value = categoryResponse.data
+    const categoryResponse = await CategoryAPI.getAllCategories();
+    tableData.value = categoryResponse.data;
   } catch (error) {
-    console.error('데이터 로딩 오류:', error)
-    ElMessage.error('메뉴 데이터를 불러오는 중 오류가 발생했습니다.')
+    console.error('카테고리 데이터 로딩 오류:', error);
+    ElMessage.error('카테고리 데이터를 불러오는 중 오류가 발생했습니다.');
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
-
-// 카테고리 필터 옵션 생성
-const categoryFilters = computed(() => {
-  return categories.value.map(category => ({
-    text: category.name,
-    value: category.id
-  }))
-})
-
-// 카테고리 이름 가져오기
-const getCategoryName = (categoryId: number): string => {
-  const category = categories.value.find(c => c.id === categoryId)
-  return category ? category.name : '미분류'
-}
-
-// 카테고리 필터링
-const filterByCategory = (value: number, row: MenuItem) => {
-  return row.category_id === value
 }
 
 // 페이지 변경 처리
@@ -185,25 +96,16 @@ const handleCurrentChange = (val: number) => {
   currentPage.value = val
 }
 
-// 가격 포맷팅 (원화)
-const formatPrice = (price: number): string => {
-  return new Intl.NumberFormat('ko-KR', { 
-    style: 'currency', 
-    currency: 'KRW',
-    minimumFractionDigits: 0
-  }).format(price)
-}
-
 // 수정 핸들러
-const handleEdit = (index: number, row: MenuItem) => {
+const handleEdit = (index: number, row: Category) => {
   console.log('수정:', index, row)
   // 여기에서 수정 기능을 구현하거나 부모 컴포넌트에 이벤트를 발생시킵니다
 }
 
 // 삭제 확인 다이얼로그
-const confirmDelete = (row: MenuItem) => {
+const confirmDeleteCategory = (row: Category) => {
   ElMessageBox.confirm(
-    `"${row.name}" 메뉴를 삭제하시겠습니까?`,
+    `"${row.name}" 카테고리를 삭제하시겠습니까?`,
     '삭제 확인',
     {
       confirmButtonText: '삭제',
@@ -212,24 +114,24 @@ const confirmDelete = (row: MenuItem) => {
     }
   )
     .then(() => {
-      deleteMenu(row.id)
+      deleteCategory(row.id)
     })
     .catch(() => {
       // 사용자가 취소를 클릭한 경우, 아무 작업도 수행하지 않음
     })
 }
 
-// 메뉴 항목 삭제
-const deleteMenu = async (id: number) => {
+// 카테고리 항목 삭제
+const deleteCategory = async (id: number) => {
   loading.value = true
   try {
-    await MenuAPI.deleteMenu(id)
-    ElMessage.success('메뉴가 삭제되었습니다.')
-    // 메뉴 목록 새로고침
+    await CategoryAPI.deleteCategory(id)
+    ElMessage.success('카테고리가 삭제되었습니다.')
+    // 카테고리 목록 새로고침
     await fetchData()
   } catch (error) {
-    console.error('메뉴 삭제 오류:', error)
-    ElMessage.error('메뉴 삭제 중 오류가 발생했습니다.')
+    console.error('카테고리 삭제 오류:', error)
+    ElMessage.error('카테고리 삭제 중 오류가 발생했습니다.')
   } finally {
     loading.value = false
   }
@@ -250,6 +152,12 @@ const deleteMenu = async (id: number) => {
   width: 85%;
   margin-bottom: 10px;
 }
+
+:deep(.el-table__row) {
+  min-height: 50px !important;
+  height: 50px !important;
+}
+
 
 .pagination-container {
   margin-top: 20px;
