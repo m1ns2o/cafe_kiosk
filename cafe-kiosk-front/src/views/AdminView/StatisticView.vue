@@ -229,13 +229,23 @@ async function fetchOrderHistory(): Promise<void> {
     const orders = await getOrders();
     
     // 날짜 범위로 필터링 (API에서 지원하지 않는 경우 프론트엔드에서 필터링)
-    const startTime = dateRange.value[0].getTime();
-    const endTime = dateRange.value[1].getTime();
-    
-    const filteredOrders = orders.filter(order => {
-      const orderTime = new Date(order.created_at).getTime();
-      return orderTime >= startTime && orderTime <= endTime;
-    });
+    const startDate = new Date(dateRange.value[0]);
+  const endDate = new Date(dateRange.value[1]);
+
+  // Set start time to beginning of day (00:00:00)
+  startDate.setHours(0, 0, 0, 0);
+  const startTime = startDate.getTime();
+
+  // Set end time to end of day (23:59:59.999)
+  endDate.setHours(23, 59, 59, 999);
+  const endTime = endDate.getTime();
+
+  const filteredOrders = orders.filter(order => {
+    const orderTime = new Date(order.created_at).getTime();
+    return orderTime >= startTime && orderTime <= endTime;
+  });
+
+orderHistory.value = filteredOrders;
 
     orderHistory.value = filteredOrders;
     
@@ -394,6 +404,7 @@ function createOrUpdateCharts(): void {
                 const value = context.raw as number;
                 const total = (context.chart.data.datasets[0].data as number[]).reduce((a, b) => (a as number) + (b as number), 0) as number;
                 const percentage = Math.round((value / total) * 100);
+              
                 return `${label}: ${value}개 (${percentage}%)`;
               }
             }
