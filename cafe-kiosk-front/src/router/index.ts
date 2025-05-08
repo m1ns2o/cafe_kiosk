@@ -7,6 +7,7 @@ import AdminView from '../views/AdminView.vue'
 import CategoryView from '../views/AdminView/CategoryView.vue'
 import MenuView from '../views/AdminView/MenuView.vue'
 import OrderManageView from '../views/AdminView/OrderManageView.vue'
+import StatisticView from '../views/AdminView/StatisticView.vue'
 
 const routes = [
   {
@@ -40,11 +41,11 @@ const routes = [
       //   name: 'AdminDashboard',
       //   component: AdminDashboard
       // },
-      // {
-      //   path: 'statistics', // /admin/statistics
-      //   name: 'AdminStatistics',
-      //   component: AdminStatistics
-      // },
+      {
+        path: 'statistics', // /admin/statistics
+        name: 'AdminStatistics',
+        component: StatisticView
+      },
       {
         path: 'category', // /admin/category
         name: 'Category',

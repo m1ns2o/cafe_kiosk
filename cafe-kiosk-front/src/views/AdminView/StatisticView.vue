@@ -1,0 +1,589 @@
+<template>
+  <div class="statistics-container">
+    <el-row :gutter="24" class="statistics-content">
+      <!-- 통계 정보 (좌측) -->
+      <el-col :xs="24" :sm="24" :md="14" :lg="14" class="statistics-col">
+        <el-card shadow="hover" class="statistics-card">
+          <template #header>
+            <div class="card-header">판매 통계</div>
+          </template>
+          
+          <!-- 항목별 판매비율 파이차트 -->
+          <div class="chart-container">
+            <h3 class="chart-title">항목별 판매비율</h3>
+            <div class="pie-chart-wrapper">
+              <div v-if="isLoading" class="chart-loading">
+                <el-skeleton animated :rows="5" />
+              </div>
+              <div v-else-if="menuSalesData.labels.length === 0" class="chart-empty">
+                <el-empty description="판매 데이터가 없습니다." />
+              </div>
+              <div v-else class="chart-container-inner">
+                <canvas ref="pieChartRef"></canvas>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 최근 이틀 매출 바차트 -->
+          <div class="chart-container">
+            <h3 class="chart-title">최근 이틀 매출</h3>
+            <div class="bar-chart-wrapper">
+              <div v-if="isLoading" class="chart-loading">
+                <el-skeleton animated :rows="5" />
+              </div>
+              <div v-else-if="dailySalesData.labels.length === 0" class="chart-empty">
+                <el-empty description="매출 데이터가 없습니다." />
+              </div>
+              <div v-else class="chart-container-inner">
+                <canvas ref="barChartRef"></canvas>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 총 매출 -->
+          <div class="total-sales-container">
+            <div class="total-sales-card">
+              <h3 class="total-sales-title">총 매출</h3>
+              <div v-if="isLoading" class="total-loading">
+                <el-skeleton animated :rows="1" />
+              </div>
+              <div v-else class="total-sales-amount">
+                {{ totalSales.toLocaleString() }}원
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+
+      <!-- 주문 내역 (우측) -->
+      <el-col :xs="24" :sm="24" :md="10" :lg="10" class="order-history-col">
+        <el-card shadow="hover" class="order-history-card">
+          <template #header>
+            <div class="card-header">
+              주문 내역
+              <el-date-picker
+                v-model="dateRange"
+                type="daterange"
+                range-separator="~"
+                start-placeholder="시작일"
+                end-placeholder="종료일"
+                format="YYYY-MM-DD"
+                size="small"
+                style="width: 240px; margin-left: 10px;"
+                @change="fetchOrderHistory"
+              />
+            </div>
+          </template>
+          
+          <div class="order-table-wrapper">
+            <div v-if="isLoading" class="table-loading">
+              <el-skeleton animated :rows="10" />
+            </div>
+            <div v-else-if="orderHistory.length === 0" class="table-empty">
+              <el-empty description="주문 내역이 없습니다." />
+            </div>
+            <el-table
+              v-else
+              :data="orderHistory"
+              style="width: 100%"
+              class="order-table"
+              :header-cell-style="{ fontSize: '15px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
+              :cell-style="{ fontSize: '14px', height: '50px' }"
+            >
+              <el-table-column prop="id" label="주문번호" width="100" />
+              <el-table-column prop="created_at" label="주문시간" min-width="180">
+                <template #default="scope">
+                  {{ formatDateTime(scope.row.created_at) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="total_price" label="주문금액" width="120" align="right">
+                <template #default="scope">
+                  {{ scope.row.total_price.toLocaleString() }}원
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { getOrders } from '../../api/orderApi';
+import type { Order, OrderItem } from '../../api/orderApi';
+import Chart from 'chart.js/auto';
+
+// 상태 변수
+const isLoading = ref(true);
+const orderHistory = ref<Order[]>([]);
+const totalSales = ref(0);
+
+// 차트 참조
+const pieChartRef = ref<HTMLCanvasElement | null>(null);
+const barChartRef = ref<HTMLCanvasElement | null>(null);
+let pieChart: Chart | null = null;
+let barChart: Chart | null = null;
+
+// 차트 데이터
+const menuSalesData = ref({
+  labels: [] as string[],
+  datasets: [{
+    data: [] as number[],
+    backgroundColor: [] as string[],
+  }]
+});
+
+const dailySalesData = ref({
+  labels: [] as string[],
+  datasets: [{
+    label: '매출',
+    data: [] as number[],
+    backgroundColor: '#82ca9d',
+  }]
+});
+
+// 날짜 범위 선택 (기본값: 최근 일주일)
+const dateRange = ref([
+  new Date(new Date().setDate(new Date().getDate() - 7)),
+  new Date()
+]);
+
+// 차트 색상
+const COLORS = [
+  '#78A1BB', // 기준 파스텔 블루
+  '#5D88A5', // 더 진한 블루
+  '#96B6CB', // 밝은 파스텔 블루
+  '#A0ACBD', // 블루 틴트가 있는 그레이
+  '#8495A8', // 진한 블루-그레이
+  '#6E7F91'  // 어두운 블루-그레이
+];
+
+
+// 날짜 포맷 함수
+function formatDateTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleString('ko-KR', {
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('ko-KR', { 
+    year: 'numeric', 
+    month: '2-digit', 
+    day: '2-digit' 
+  }).replace(/\. /g, '-').replace(/\.$/, '');
+}
+
+// 주문 내역 가져오기
+async function fetchOrderHistory(): Promise<void> {
+  isLoading.value = true;
+
+  try {
+    // 실제 API 호출 (orderApi에 적절한 함수가 있다고 가정)
+    // const startDate = formatDate(dateRange.value[0]);
+    // const endDate = formatDate(dateRange.value[1]);
+    // const orders = await getOrdersByDateRange(startDate, endDate);
+    
+    // 임시: 모든 주문 가져오기 (실제로는 날짜 범위로 필터링 해야함)
+    const orders = await getOrders();
+    
+    // 날짜 범위로 필터링 (API에서 지원하지 않는 경우 프론트엔드에서 필터링)
+    const startTime = dateRange.value[0].getTime();
+    const endTime = dateRange.value[1].getTime();
+    
+    const filteredOrders = orders.filter(order => {
+      const orderTime = new Date(order.created_at).getTime();
+      return orderTime >= startTime && orderTime <= endTime;
+    });
+
+    orderHistory.value = filteredOrders;
+    
+    // 통계 데이터 계산
+    calculateStatistics(filteredOrders);
+    
+    // 차트 업데이트/생성 (nextTick을 사용하여 DOM이 업데이트된 후 실행)
+    nextTick(() => {
+      setTimeout(() => {
+        createOrUpdateCharts();
+      }, 100); // 약간의 지연을 주어 DOM이 완전히 렌더링되도록 함
+    });
+  } catch (error) {
+    console.error('주문 내역을 불러오는데 실패했습니다:', error);
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+// 통계 데이터 계산
+function calculateStatistics(orders: Order[]): void {
+  // 1. 메뉴별 판매량 계산 (파이차트용)
+  const menuSales = new Map<string, number>();
+  
+  orders.forEach(order => {
+    order.order_items.forEach(item => {
+      const menuName = item.menu.name;
+      const quantity = item.quantity;
+      menuSales.set(menuName, (menuSales.get(menuName) || 0) + quantity);
+    });
+  });
+  
+  // 메뉴 판매 데이터를 차트.js 형식으로 변환
+  const menuNames: string[] = [];
+  const menuQuantities: number[] = [];
+  const menuColors: string[] = [];
+  
+  // 색상 동적 생성 함수 (항목이 COLORS 배열보다 많을 경우 사용)
+  const generateColor = (index: number): string => {
+    // 기본 색상 사용
+    if (index < COLORS.length) {
+      return COLORS[index];
+    }
+    
+    // 기본 색상 #78A1BB를 HSL로 변환 (여기서는 대략적인 값 사용)
+    // 실제 #78A1BB는 HSL로 약 (203, 33%, 66%)
+    const baseHue = 203;
+    const baseSaturation = 33;
+    const baseLightness = 66;
+    
+    // 항목 수에 따라 색조(hue)만 골고루 분포
+    const hueStep = 360 / (index + COLORS.length);
+    const newHue = (baseHue + (index * hueStep)) % 360;
+    
+    // 채도와 명도는 비슷하게 유지하되 약간의 변화를 줌
+    const newSaturation = baseSaturation + (index % 3) * 5;
+    const newLightness = baseLightness + (index % 4 - 2) * 5;
+    
+    return `hsl(${newHue}, ${newSaturation}%, ${newLightness}%)`;
+  };
+  
+  let i = 0;
+  menuSales.forEach((quantity, name) => {
+    menuNames.push(name);
+    menuQuantities.push(quantity);
+    menuColors.push(generateColor(i));
+    i++;
+  });
+  
+  // 차트 데이터 업데이트
+  menuSalesData.value = {
+    labels: menuNames,
+    datasets: [{
+      data: menuQuantities,
+      backgroundColor: menuColors,
+    }]
+  };
+  
+  // 2. 최근 이틀 매출 계산 (바차트용)
+  const dailySales = new Map<string, number>();
+  
+  // 현재 날짜와 어제 날짜 계산
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const todayStr = formatDate(today);
+  const yesterdayStr = formatDate(yesterday);
+  
+  // 초기값 설정 (데이터가 없는 날도 표시)
+  dailySales.set(yesterdayStr, 0);
+  dailySales.set(todayStr, 0);
+  
+  orders.forEach(order => {
+    const orderDate = formatDate(new Date(order.created_at));
+    if (orderDate === todayStr || orderDate === yesterdayStr) {
+      dailySales.set(orderDate, (dailySales.get(orderDate) || 0) + order.total_price);
+    }
+  });
+  
+  // 날짜순으로 정렬된 데이터 생성
+  const sortedDates = Array.from(dailySales.keys()).sort();
+  const salesData = sortedDates.map(date => dailySales.get(date) || 0);
+  
+  // 차트 데이터 업데이트
+  dailySalesData.value = {
+    labels: sortedDates,
+    datasets: [{
+      label: '매출',
+      data: salesData,
+      backgroundColor: '#78A1BB',  // 메인 색상 사용
+    }]
+  };
+  
+  // 3. 총 매출 계산
+  totalSales.value = orders.reduce((sum, order) => sum + order.total_price, 0);
+}
+
+// 차트 생성 또는 업데이트
+function createOrUpdateCharts(): void {
+  // 파이 차트 생성/업데이트
+  if (pieChartRef.value) {
+    // 기존 차트가 있으면 제거
+    if (pieChart) {
+      pieChart.destroy();
+    }
+    
+    // 새 차트 생성
+    pieChart = new Chart(pieChartRef.value, {
+      type: 'pie',
+      data: menuSalesData.value,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false, // 컨테이너에 맞게 크기 조정
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              font: {
+                size: 12
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.label || '';
+                const value = context.raw as number;
+                const total = (context.chart.data.datasets[0].data as number[]).reduce((a, b) => (a as number) + (b as number), 0) as number;
+                const percentage = Math.round((value / total) * 100);
+                return `${label}: ${value}개 (${percentage}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  // 바 차트 생성/업데이트
+  if (barChartRef.value) {
+    // 기존 차트가 있으면 제거
+    if (barChart) {
+      barChart.destroy();
+    }
+    
+    // 새 차트 생성
+    barChart = new Chart(barChartRef.value, {
+      type: 'bar',
+      data: dailySalesData.value,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false, // 컨테이너에 맞게 크기 조정
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return value.toLocaleString() + '원';
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            labels: {
+              font: {
+                size: 12
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.raw as number;
+                return `매출: ${value.toLocaleString()}원`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  console.log('차트 생성/업데이트 완료:', 
+              '파이차트:', pieChart ? 'O' : 'X', 
+              '바차트:', barChart ? 'O' : 'X');
+}
+
+// 컴포넌트 마운트 시 데이터 로드
+onMounted(() => {
+  fetchOrderHistory();
+});
+
+// 컴포넌트 언마운트 시 차트 인스턴스 제거
+onUnmounted(() => {
+  if (pieChart) {
+    pieChart.destroy();
+    pieChart = null;
+  }
+  
+  if (barChart) {
+    barChart.destroy();
+    barChart = null;
+  }
+});
+</script>
+
+<style scoped>
+.statistics-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  padding: 20px;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.statistics-content {
+  width: 100%;
+  max-width: 1400px;
+  height: 100%;
+}
+
+.statistics-col,
+.order-history-col {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.statistics-card,
+.order-history-card {
+  height: 100%;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.el-card__body) {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+  font-size: 18px;
+  padding: 5px 0;
+}
+
+.chart-container {
+  margin-bottom: 30px;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #606266;
+}
+
+.pie-chart-wrapper,
+.bar-chart-wrapper {
+  height: 300px;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #f8f9fb;
+  padding: 10px;
+  position: relative;
+}
+
+.chart-container-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.total-sales-container {
+  margin-top: 15px;
+}
+
+.total-sales-card {
+  padding: 20px;
+  background-color: #f0f9ff;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.total-sales-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #303133;
+}
+
+.total-sales-amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #409eff;
+}
+
+.order-table-wrapper {
+  flex: 1;
+  position: relative;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.order-table {
+  flex: 1;
+  height: 100%;
+  overflow: auto;
+}
+
+.chart-loading,
+.table-loading,
+.total-loading {
+  padding: 20px;
+}
+
+.chart-empty,
+.table-empty {
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 0;
+}
+
+/* 모바일 반응형 스타일 */
+@media (max-width: 768px) {
+  .statistics-container {
+    padding: 10px;
+    height: auto;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .el-date-picker {
+    margin-left: 0 !important;
+    margin-top: 10px;
+    width: 100% !important;
+  }
+  
+  .total-sales-amount {
+    font-size: 24px;
+  }
+}
+</style>
