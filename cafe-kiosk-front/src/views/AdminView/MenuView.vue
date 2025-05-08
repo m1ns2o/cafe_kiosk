@@ -179,7 +179,8 @@ const filterByCategory = (value: number, row: MenuItem) => {
 }
 
 // 필터 변경 이벤트 핸들러
-const onFilterChange = (filters: Record<string, any>) => {
+//any를 string으로 변경
+const onFilterChange = (filters: Record<string, string>) => {
   categoryFilterValue.value = filters.category_id || []
 }
 

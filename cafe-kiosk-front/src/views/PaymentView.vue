@@ -11,7 +11,7 @@ const router = useRouter(); // 라우터 활성화
 // 결제 상태
 const paymentStatus = ref<'pending' | 'success' | 'failed'>('pending');
 const statusMessage = ref<string>('결제를 진행 중입니다...');
-// const paymentDetails = ref<any>(null);
+
 
 // QR 코드 관련
 const qrCodeDataUrl = ref<string>('');
