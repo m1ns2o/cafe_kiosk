@@ -66,9 +66,9 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
-import type { Order, OrderItem } from '../../api/orderApi';
+import type { Order } from '../../api/orderApi';
 import { getOrders } from '../../api/orderApi';
-import { ElNotification } from 'element-plus';
+import { ElNotification, ElTable } from 'element-plus';
 
 // 타입 정의 (api에서 import가 불가능할 경우 여기서 선언)
 // interface Order {
@@ -88,7 +88,7 @@ import { ElNotification } from 'element-plus';
 
 const orders = ref<Order[]>([]);
 const selectedOrderId = ref<number | null>(null);
-const orderTable = ref(null);
+const orderTable = ref<InstanceType<typeof ElTable> | null>(null);
 const previousOrderIds = ref<number[]>([]);
 const isFirstLoad = ref(true);
 let pollingInterval: number | null = null;
@@ -181,7 +181,7 @@ function scrollToSelectedOrder(): void {
   // 선택된 주문이 테이블에서 보이도록 스크롤
   if (orderTable.value) {
     // Element Plus의 테이블 메서드 사용
-    orderTable.value.scrollToRow(
+    orderTable.value.scrollTo(
       sortedOrders.value.findIndex(order => order.id === selectedOrderId.value)
     );
   }
