@@ -150,7 +150,7 @@ const dateRange = ref([
   new Date()
 ]);
 
-// 차트 색상
+// 차트 색상 - 블루와 그레이 계열 6개
 const COLORS = [
   '#78A1BB', // 기준 파스텔 블루
   '#5D88A5', // 더 진한 블루
@@ -159,7 +159,6 @@ const COLORS = [
   '#8495A8', // 진한 블루-그레이
   '#6E7F91'  // 어두운 블루-그레이
 ];
-
 
 // 날짜 포맷 함수
 function formatDateTime(dateStr: string): string {
@@ -295,12 +294,22 @@ function calculateStatistics(orders: Order[]): void {
   dailySales.set(yesterdayStr, 0);
   dailySales.set(todayStr, 0);
   
+  // 3. 총 매출 계산 - 더 효율적인 방법 (한 번의 루프로 두 가지 계산)
+  let totalSalesAmount = 0;
+  
   orders.forEach(order => {
+    // 총 매출에 더하기
+    totalSalesAmount += order.total_price;
+    
+    // 날짜별 매출에 더하기
     const orderDate = formatDate(new Date(order.created_at));
     if (orderDate === todayStr || orderDate === yesterdayStr) {
       dailySales.set(orderDate, (dailySales.get(orderDate) || 0) + order.total_price);
     }
   });
+  
+  // 총 매출 업데이트
+  totalSales.value = totalSalesAmount;
   
   // 날짜순으로 정렬된 데이터 생성
   const sortedDates = Array.from(dailySales.keys()).sort();
@@ -315,9 +324,6 @@ function calculateStatistics(orders: Order[]): void {
       backgroundColor: '#78A1BB',  // 메인 색상 사용
     }]
   };
-  
-  // 3. 총 매출 계산
-  totalSales.value = orders.reduce((sum, order) => sum + order.total_price, 0);
 }
 
 // 차트 생성 또는 업데이트
@@ -434,12 +440,10 @@ onUnmounted(() => {
 .statistics-container {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
   height: 100%;
-  min-height: 100vh;
   padding: 20px;
-  position: relative;
   box-sizing: border-box;
 }
 
@@ -482,19 +486,19 @@ onUnmounted(() => {
 }
 
 .chart-container {
-  margin-bottom: 30px;
+  margin-bottom: 20px; /* 30px에서 20px로 줄임 */
 }
 
 .chart-title {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 15px;
+  margin-bottom: 10px; /* 15px에서 10px로 줄임 */
   color: #606266;
 }
 
 .pie-chart-wrapper,
 .bar-chart-wrapper {
-  height: 300px;
+  height: 250px; /* 300px에서 250px로 줄임 */
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
@@ -510,21 +514,24 @@ onUnmounted(() => {
 }
 
 .total-sales-container {
-  margin-top: 15px;
-}
-
-.total-sales-card {
-  padding: 20px;
+  /* margin-top: 5px; 새로 추가: 위 여백 줄임 */
+  padding: 10px;
   background-color: #f0f9ff;
   border-radius: 8px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.total-sales-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .total-sales-title {
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 15px;
+  margin-bottom: 10px; /* 15px에서 10px로 줄임 */
   color: #303133;
 }
 
@@ -582,7 +589,12 @@ onUnmounted(() => {
     width: 100% !important;
   }
   
-  .total-sales-amount {
+  .pie-chart-wrapper,
+  .bar-chart-wrapper {
+    height: 220px; /* 모바일에서 더 작게 */
+  }
+  
+  .total-amount {
     font-size: 24px;
   }
 }
