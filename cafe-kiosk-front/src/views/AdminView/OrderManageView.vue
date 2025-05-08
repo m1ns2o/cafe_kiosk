@@ -18,7 +18,7 @@
               :cell-style="{ fontSize: '15px', height: '60px' }"
               ref="orderTable"
             >
-              <el-table-column prop="id" label="주문번호" width="100" />
+              <el-table-column prop="id" label="주문번호" width="100" align="center"/>
               <el-table-column prop="created_at" label="주문시간" min-width="150">
                 <template #default="scope">
                   {{ formatDate(scope.row.created_at) }}

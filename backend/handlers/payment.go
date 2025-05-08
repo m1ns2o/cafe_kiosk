@@ -35,8 +35,8 @@ func ProcessPayment(c *gin.Context) {
     }
 
     // 50초 동안 2초 간격으로 체크 (총 25회)
-    maxAttempts := 10
-    interval := 2 * time.Second
+    maxAttempts := 20
+    interval := 3 * time.Second
     success := false
     var actualChange int64
     var err error

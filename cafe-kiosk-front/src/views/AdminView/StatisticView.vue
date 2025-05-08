@@ -245,9 +245,7 @@ async function fetchOrderHistory(): Promise<void> {
     return orderTime >= startTime && orderTime <= endTime;
   });
 
-orderHistory.value = filteredOrders;
-
-    orderHistory.value = filteredOrders;
+  orderHistory.value = filteredOrders;
     
     // 통계 데이터 계산
     calculateStatistics(filteredOrders);
