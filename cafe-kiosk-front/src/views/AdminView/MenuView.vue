@@ -1,98 +1,108 @@
 <template>
-  <div class="main">
-    <el-table 
-      ref="tableRef" 
-      row-key="id" 
-      :data="pagedTableData" 
-      header-cell-class-name="table-header"
-      v-loading="loading"
-      class="menu-table"
-    >
-      <!-- 기존 테이블 컬럼들... -->
-      <!-- 이미지 열 -->
-      <el-table-column label="이미지" class-name="image-column" align="left">
-        <template #default="scope">
-          <div class="image-container">
-            <img v-if="scope.row.image_url" 
-                 :src="scope.row.image_url" 
-                 :alt="scope.row.name" 
-                 class="menu-image" />
-            <el-icon v-else><picture-rounded /></el-icon>
+  <div class="menu-container">
+    <div class="menu-content">
+      <el-card shadow="hover" class="menu-card">
+        <template #header>
+          <div class="card-header">
+            <span class="header-title">메뉴 관리</span>
+            <!-- 필요한 경우 여기에 추가 버튼 등을 배치할 수 있습니다 -->
           </div>
         </template>
-      </el-table-column>
-      
-      <!-- 메뉴 이름 열 -->
-      <el-table-column prop="name" label="메뉴" class-name="name-column" align="left">
-        <template #default="scope">
-          <el-popover effect="light" trigger="hover" placement="top" width="auto">
-            <template #default>
-              <div>이름: {{ scope.row.name }}</div>
-              <div>가격: {{ formatPrice(scope.row.price) }}</div>
-              <div>카테고리: {{ getCategoryName(scope.row.category_id) }}</div>
+        
+        <el-table 
+          ref="tableRef" 
+          row-key="id" 
+          :data="pagedTableData" 
+          header-cell-class-name="table-header"
+          v-loading="loading"
+          class="menu-table"
+        >
+          <!-- 이미지 열 -->
+          <el-table-column label="이미지" class-name="image-column" align="left">
+            <template #default="scope">
+              <div class="image-container">
+                <img v-if="scope.row.image_url" 
+                    :src="scope.row.image_url" 
+                    :alt="scope.row.name" 
+                    class="menu-image" />
+                <el-icon v-else><picture-rounded /></el-icon>
+              </div>
             </template>
-            <template #reference>
-              <span>{{ scope.row.name }}</span>
+          </el-table-column>
+          
+          <!-- 메뉴 이름 열 -->
+          <el-table-column prop="name" label="메뉴" class-name="name-column" align="left">
+            <template #default="scope">
+              <el-popover effect="light" trigger="hover" placement="top" width="auto">
+                <template #default>
+                  <div>이름: {{ scope.row.name }}</div>
+                  <div>가격: {{ formatPrice(scope.row.price) }}</div>
+                  <div>카테고리: {{ getCategoryName(scope.row.category_id) }}</div>
+                </template>
+                <template #reference>
+                  <span>{{ scope.row.name }}</span>
+                </template>
+              </el-popover>
             </template>
-          </el-popover>
-        </template>
-      </el-table-column>
-      
-      <!-- 가격 열 -->
-      <el-table-column prop="price" label="가격" class-name="price-column" align="left">
-        <template #default="scope">
-          <span>{{ formatPrice(scope.row.price) }}</span>
-        </template>
-      </el-table-column>
-      
-      <!-- 카테고리 열 -->
-      <el-table-column
-        prop="category_id"
-        label="카테고리"
-        class-name="category-column"
-        align="left"
-        :filters="categoryFilters"
-        :filter-method="filterByCategory"
-        filter-placement="bottom-end"
-        @filter-change="onFilterChange"
-      >
-        <template #default="scope">
-          <span>{{ getCategoryName(scope.row.category_id) }}</span>
-        </template>
-      </el-table-column>
-      
-      <!-- 작업 열 -->
-      <el-table-column label="" class-name="action-column" align="right">
-        <template #default="scope">
-          <div class="action-buttons">
-            <el-icon 
-              class="action-icon edit-icon" 
-              @click="handleEdit(scope.$index, scope.row)"
-            >
-              <Edit />
-            </el-icon>
-            <el-icon
-              class="action-icon delete-icon"
-              @click="confirmDelete(scope.row)"
-            >
-              <Delete />
-            </el-icon>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
-    
-    <!-- 페이지네이션 추가 -->
-    <div class="pagination-container">
-      <el-pagination
-        v-model:current-page="currentPage"
-        :page-size="pageSize"
-        layout="total, prev, pager, next"
-        :total="filteredTableData.length"
-        @current-change="handleCurrentChange"
-        :pager-count="5"
-        background
-      />
+          </el-table-column>
+          
+          <!-- 가격 열 -->
+          <el-table-column prop="price" label="가격" class-name="price-column" align="left">
+            <template #default="scope">
+              <span>{{ formatPrice(scope.row.price) }}</span>
+            </template>
+          </el-table-column>
+          
+          <!-- 카테고리 열 -->
+          <el-table-column
+            prop="category_id"
+            label="카테고리"
+            class-name="category-column"
+            align="left"
+            :filters="categoryFilters"
+            :filter-method="filterByCategory"
+            filter-placement="bottom-end"
+            @filter-change="onFilterChange"
+          >
+            <template #default="scope">
+              <span>{{ getCategoryName(scope.row.category_id) }}</span>
+            </template>
+          </el-table-column>
+          
+          <!-- 작업 열 -->
+          <el-table-column label="" class-name="action-column" align="right">
+            <template #default="scope">
+              <div class="action-buttons">
+                <el-icon 
+                  class="action-icon edit-icon" 
+                  @click="handleEdit(scope.$index, scope.row)"
+                >
+                  <Edit />
+                </el-icon>
+                <el-icon
+                  class="action-icon delete-icon"
+                  @click="confirmDelete(scope.row)"
+                >
+                  <Delete />
+                </el-icon>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <!-- 페이지네이션 추가 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="currentPage"
+            :page-size="pageSize"
+            layout="total, prev, pager, next"
+            :total="filteredTableData.length"
+            @current-change="handleCurrentChange"
+            :pager-count="5"
+            background
+          />
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -179,8 +189,8 @@ const filterByCategory = (value: number, row: MenuItem) => {
 }
 
 // 필터 변경 이벤트 핸들러
-//any를 string으로 변경
-const onFilterChange = (filters: Record<string, string>) => {
+// any 타입을 제거하고 명확한 타입으로 변경
+const onFilterChange = (filters: Record<string, number[]>) => {
   categoryFilterValue.value = filters.category_id || []
 }
 
@@ -241,23 +251,53 @@ const deleteMenu = async (id: number) => {
 </script>
 
 <style scoped>
-.main {
+.menu-container {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  align-items: center; /* flex-start에서 center로 변경 */
+  width: 100%;
+  min-height: 100%; /* 80vh에서 100vh로 변경하여 전체 높이 활용 */
+  padding: 20px;
+}
+
+.menu-content {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
+}
+
+.menu-card {
+  width: 95%; /* 너비 제한 추가 */
   height: 100%;
+  margin: 0 auto; /* 상하 여백 제거하고 좌우 자동 마진 설정 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.header-title {
+  font-weight: bold;
+  font-size: 18px;
 }
 
 .menu-table {
-  width: 85%;
+  width: 100%;
   margin-bottom: 10px;
 }
 
 .pagination-container {
   margin-top: 20px;
-  margin-bottom: 30px;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: center;
 }
 
 .image-container {
@@ -271,17 +311,27 @@ const deleteMenu = async (id: number) => {
   max-height: 50px;
   max-width: 50px;
   object-fit: contain;
+  border-radius: 4px;
 }
 
 /* 테이블 헤더와 셀 정렬 */
 .table-header {
   text-align: left !important;
   font-weight: bold;
+  background-color: #f5f7fa !important;
+  height: 50px;
+  font-size: 15px;
 }
 
 :deep(.el-table__header-wrapper .el-table__header th) {
   text-align: left !important;
 }
+
+:deep(.el-table__row) {
+  height: 60px;
+  font-size: 14px;
+}
+
 
 /* 개선된 컬럼 너비 설정 - 백분율 기반 */
 :deep(.image-column) {
@@ -334,24 +384,31 @@ const deleteMenu = async (id: number) => {
 .action-icon {
   font-size: 18px;
   cursor: pointer;
+  transition: transform 0.2s, color 0.2s;
+}
+
+.action-icon:hover {
+  transform: scale(1.2);
 }
 
 .edit-icon {
   color: #a0a0a0; /* --nordic-icon-light-gray */
 }
 
+.edit-icon:hover {
+  color: #409eff; /* Element Plus primary color */
+}
+
 .delete-icon {
   color: #f56c6c; /* Element Plus danger color */
 }
 
+.delete-icon:hover {
+  color: #e41e1e; /* Darker red on hover */
+}
 
 /* 미디어 쿼리 */
 @media screen and (min-width: 1201px) {
-  .menu-table {
-    width: 80%;
-    margin: 0 auto;
-  }
-  
   :deep(.image-column) {
     width: 100px !important;
   }
@@ -374,11 +431,6 @@ const deleteMenu = async (id: number) => {
 }
 
 @media screen and (min-width: 993px) and (max-width: 1200px) {
-  .menu-table {
-    width: 80%;
-    margin: 0 auto;
-  }
-  
   :deep(.image-column) {
     width: 90px !important;
   }
@@ -401,11 +453,6 @@ const deleteMenu = async (id: number) => {
 }
 
 @media screen and (min-width: 769px) and (max-width: 992px) {
-  .menu-table {
-    width: 80%;
-    margin: 0 auto;
-  }
-  
   :deep(.image-column) {
     width: 80px !important;
   }
@@ -428,9 +475,8 @@ const deleteMenu = async (id: number) => {
 }
 
 @media screen and (min-width: 577px) and (max-width: 768px) {
-  .menu-table {
-    width: 85%;
-    margin: 0 auto;
+  .menu-container {
+    padding: 10px;
   }
   
   :deep(.image-column) {
@@ -455,9 +501,8 @@ const deleteMenu = async (id: number) => {
 }
 
 @media screen and (min-width: 401px) and (max-width: 576px) {
-  .menu-table {
-    width: 90%;
-    margin: 0 auto;
+  .menu-container {
+    padding: 10px;
   }
   
   :deep(.image-column) {
@@ -482,9 +527,8 @@ const deleteMenu = async (id: number) => {
 }
 
 @media screen and (max-width: 400px) {
-  .menu-table {
-    width: 100%;
-    margin: 0 auto;
+  .menu-container {
+    padding: 5px;
   }
   
   :deep(.image-column) {

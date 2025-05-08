@@ -16,6 +16,7 @@
               :row-class-name="rowClassName"
               :header-cell-style="{ fontSize: '16px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
               :cell-style="{ fontSize: '15px', height: '60px' }"
+              ref="orderTable"
             >
               <el-table-column prop="id" label="주문번호" width="100" />
               <el-table-column prop="created_at" label="주문시간" min-width="150">
@@ -64,9 +65,10 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import type { Order, OrderItem } from '../../api/orderApi';
 import { getOrders } from '../../api/orderApi';
+import { ElNotification } from 'element-plus';
 
 // 타입 정의 (api에서 import가 불가능할 경우 여기서 선언)
 // interface Order {
@@ -86,6 +88,10 @@ import { getOrders } from '../../api/orderApi';
 
 const orders = ref<Order[]>([]);
 const selectedOrderId = ref<number | null>(null);
+const orderTable = ref(null);
+const previousOrderIds = ref<number[]>([]);
+const isFirstLoad = ref(true);
+let pollingInterval: number | null = null;
 
 const sortedOrders = computed(() => {
   return [...orders.value].sort((a, b) =>
@@ -103,9 +109,81 @@ const selectedOrderItems = computed(() =>
 
 async function fetchOrders(): Promise<void> {
   try {
-    orders.value = await getOrders();
+    const newOrders = await getOrders();
+    
+    // 첫 로드가 아닌 경우에만 새 주문 알림 처리
+    if (!isFirstLoad.value) {
+      // 새로운 주문이 있는지 확인
+      const newOrderIds = newOrders.map(order => order.id);
+      const currentOrderIds = orders.value.map(order => order.id);
+      
+      // 새로운 주문들 (현재 목록에 없는 ID를 가진 주문들)
+      const addedOrders = newOrders.filter(order => !currentOrderIds.includes(order.id));
+      
+      // 새로운 주문이 있으면 알림 표시 및 첫 번째 새 주문 선택
+      if (addedOrders.length > 0) {
+        showNewOrderNotification(addedOrders);
+        
+        // 새 주문 중 가장 최근 것을 선택
+        const latestNewOrder = addedOrders.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
+        
+        selectedOrderId.value = latestNewOrder.id;
+        
+        // 테이블에서 해당 주문으로 스크롤
+        nextTick(() => {
+          scrollToSelectedOrder();
+        });
+      }
+      
+      // 이전 주문 ID 목록 업데이트
+      previousOrderIds.value = newOrderIds;
+    } else {
+      // 첫 로드인 경우
+      // 주문이 있으면 첫 번째 주문 선택
+      // if (newOrders.length > 0) {
+      //   selectedOrderId.value = newOrders[0].id;
+      // }
+      
+      // 이전 주문 ID 목록 초기화
+      previousOrderIds.value = newOrders.map(order => order.id);
+      
+      // 첫 로드 완료 표시
+      isFirstLoad.value = false;
+    }
+    
+    // 주문 목록 업데이트 (첫 로드 여부와 관계없이 항상 실행)
+    orders.value = newOrders;
+    
   } catch (error) {
     console.error('주문 목록을 불러오는데 실패했습니다:', error);
+  }
+}
+
+function showNewOrderNotification(newOrders: Order[]): void {
+  // 새 주문 정보 요약
+  const orderList = newOrders.map(order => {
+    const items = order.order_items.map(item => `${item.menu.name} ${item.quantity}개`).join(', ');
+    return `주문 #${order.id}: ${items}`;
+  }).join('\n');
+  
+  ElNotification({
+    title: `새로운 주문 ${newOrders.length}건이 접수되었습니다`,
+    message: orderList,
+    type: 'success',
+    duration: 5000,
+    position: 'top-right'
+  });
+}
+
+function scrollToSelectedOrder(): void {
+  // 선택된 주문이 테이블에서 보이도록 스크롤
+  if (orderTable.value) {
+    // Element Plus의 테이블 메서드 사용
+    orderTable.value.scrollToRow(
+      sortedOrders.value.findIndex(order => order.id === selectedOrderId.value)
+    );
   }
 }
 
@@ -128,8 +206,28 @@ function formatDate(dateStr: string): string {
   });
 }
 
+// 1초마다 주문 업데이트 폴링 시작
+function startPolling(): void {
+  if (!pollingInterval) {
+    fetchOrders(); // 즉시 첫 번째 데이터 로드 (isFirstLoad가 true인 상태)
+    pollingInterval = window.setInterval(fetchOrders, 1000);
+  }
+}
+
+// 폴링 중지 (컴포넌트 언마운트 시)
+function stopPolling(): void {
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+    pollingInterval = null;
+  }
+}
+
 onMounted(() => {
-  fetchOrders();
+  startPolling();
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 </script>
 
@@ -137,9 +235,9 @@ onMounted(() => {
 .order-container {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
-  min-height: 80vh;
+  min-height: 100%;
   padding: 20px;
   position: relative;
 }
@@ -221,6 +319,16 @@ onMounted(() => {
 
 :deep(.el-table__body-wrapper) {
   scrollbar-width: none;
+}
+
+/* 새로운 주문 행 스타일 - 잠시 깜빡임 효과 */
+@keyframes newOrderHighlight {
+  0% { background-color: rgba(64, 158, 255, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.new-order-row {
+  animation: newOrderHighlight 2s ease-in-out;
 }
 
 /* 모바일 반응형 스타일 */

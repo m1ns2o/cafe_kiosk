@@ -1,47 +1,61 @@
 <template>
-  <div class="main">
-    <el-table 
-      ref="tableRef" 
-      row-key="id" 
-      :data="pagedTableData" 
-      header-cell-class-name="table-header"
-      v-loading="loading"
-      class="menu-table"
-    >
-      <!-- 메뉴 이름 열 -->
-      <el-table-column prop="name" label="카테고리" class-name="name-column" align="left" />
-      <!-- 작업 열 -->
-      <el-table-column label="" class-name="action-column" align="right">
-        <template #default="scope">
-          <div class="action-buttons">
-            <el-icon 
-              class="action-icon edit-icon" 
-              @click="handleEdit(scope.$index, scope.row)"
-            >
-              <Edit />
-            </el-icon>
-            <el-icon
-              class="action-icon delete-icon"
-              @click="confirmDeleteCategory(scope.row)"
-            >
-              <Delete />
-            </el-icon>
+  <div class="category-container">
+    <div class="category-content">
+      <el-card shadow="hover" class="category-card">
+        <template #header>
+          <div class="card-header">
+            <span class="header-title">카테고리 관리</span>
+            <!-- 필요한 경우 여기에 추가 버튼 등을 배치할 수 있습니다 -->
           </div>
         </template>
-      </el-table-column>
-    </el-table>
-    
-    <!-- 페이지네이션 추가 -->
-    <div class="pagination-container">
-      <el-pagination
-        v-model:current-page="currentPage"
-        :page-size="pageSize"
-        layout="total, prev, pager, next"
-        :total="filteredTableData.length"
-        @current-change="handleCurrentChange"
-        :pager-count="5"
-        background
-      />
+        
+        <el-table 
+          ref="tableRef" 
+          row-key="id" 
+          :data="pagedTableData" 
+          header-cell-class-name="table-header"
+          v-loading="loading"
+          class="category-table"
+          :header-cell-style="{ fontSize: '16px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
+          :cell-style="{ fontSize: '15px', height: '60px' }"
+        >
+          <!-- 카테고리 이름 열 -->
+          <el-table-column prop="name" label="카테고리" class-name="name-column" align="left" />
+          
+          <!-- 작업 열 -->
+          <el-table-column label="" class-name="action-column" align="right">
+            <template #default="scope">
+              <div class="action-buttons">
+                <el-icon 
+                  class="action-icon edit-icon" 
+                  @click="handleEdit(scope.$index, scope.row)"
+                >
+                  <Edit />
+                </el-icon>
+                <el-icon
+                  class="action-icon delete-icon"
+                  @click="confirmDeleteCategory(scope.row)"
+                >
+                  <Delete />
+                </el-icon>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <!-- 페이지네이션 추가 -->
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="currentPage"
+            :page-size="pageSize"
+            layout="total, prev, pager, next"
+            :total="filteredTableData.length"
+            @current-change="handleCurrentChange"
+            :pager-count="5"
+            background
+          />
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -63,7 +77,7 @@ const currentPage = ref(1)
 const pageSize = ref(8) // 페이지당 8개 항목
 
 // 필터링된 테이블 데이터 
-const filteredTableData = computed(() => tableData.value )
+const filteredTableData = computed(() => tableData.value)
 
 // 현재 페이지에 표시할 데이터
 const pagedTableData = computed(() => {
@@ -139,88 +153,83 @@ const deleteCategory = async (id: number) => {
 </script>
 
 <style scoped>
-.main {
+.category-container {
   display: flex;
-  flex-direction: column;
   justify-content: center;
   align-items: center;
   width: 100%;
-  height: 100%;
+  min-height: 100vh;
+  padding: 20px;
 }
 
-.menu-table {
-  width: 85%;
+.category-content {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.category-card {
+  width: 95%;
+  height: 100%;
+  margin: 0 auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+}
+
+.header-title {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.category-table {
+  width: 100%;
   margin-bottom: 10px;
 }
 
-:deep(.el-table__row) {
-  min-height: 50px !important;
-  height: 50px !important;
-}
-
-
 .pagination-container {
   margin-top: 20px;
-  margin-bottom: 30px;
-}
-
-.image-container {
+  margin-bottom: 10px;
   display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  height: 50px;
-}
-
-.menu-image {
-  max-height: 50px;
-  max-width: 50px;
-  object-fit: contain;
+  justify-content: center;
 }
 
 /* 테이블 헤더와 셀 정렬 */
 .table-header {
   text-align: left !important;
   font-weight: bold;
+  background-color: #f5f7fa !important;
 }
 
 :deep(.el-table__header-wrapper .el-table__header th) {
   text-align: left !important;
 }
 
-/* 개선된 컬럼 너비 설정 - 백분율 기반 */
-:deep(.image-column) {
-  width: 100px !important;
+:deep(.el-table__row) {
+  height: 60px;
+  font-size: 14px;
 }
 
+
+
+/* 개선된 컬럼 너비 설정 */
 :deep(.name-column) {
-  width: 35% !important; 
-}
-
-:deep(.price-column) {
-  width: 15% !important;
-}
-
-:deep(.category-column) {
-  width: 20% !important;
+  width: calc(100% - 80px) !important; 
 }
 
 :deep(.action-column) {
   width: 80px !important;
 }
 
-:deep(.el-table__row .image-column) {
-  text-align: left !important;
-}
-
 :deep(.el-table__row .name-column) {
-  text-align: left !important;
-}
-
-:deep(.el-table__row .price-column) {
-  text-align: left !important;
-}
-
-:deep(.el-table__row .category-column) {
   text-align: left !important;
 }
 
@@ -238,177 +247,60 @@ const deleteCategory = async (id: number) => {
 .action-icon {
   font-size: 18px;
   cursor: pointer;
+  transition: transform 0.2s, color 0.2s;
+}
+
+.action-icon:hover {
+  transform: scale(1.2);
 }
 
 .edit-icon {
   color: #a0a0a0; /* --nordic-icon-light-gray */
 }
 
+.edit-icon:hover {
+  color: #409eff; /* Element Plus primary color */
+}
+
 .delete-icon {
   color: #f56c6c; /* Element Plus danger color */
 }
 
+.delete-icon:hover {
+  color: #e41e1e; /* Darker red on hover */
+}
 
 /* 미디어 쿼리 */
-@media screen and (min-width: 1201px) {
-  .menu-table {
-    width: 80%;
-    margin: 0 auto;
+@media screen and (max-width: 768px) {
+  .category-container {
+    padding: 10px;
   }
   
-  :deep(.image-column) {
-    width: 100px !important;
-  }
-  
-  :deep(.name-column) {
-    width: 35% !important;
-  }
-  
-  :deep(.price-column) {
-    width: 15% !important;
-  }
-  
-  :deep(.category-column) {
-    width: 20% !important;
-  }
-  
-  :deep(.action-column) {
-    width: 80px !important;
-  }
-}
-
-@media screen and (min-width: 993px) and (max-width: 1200px) {
-  .menu-table {
-    width: 80%;
-    margin: 0 auto;
-  }
-  
-  :deep(.image-column) {
-    width: 90px !important;
-  }
-  
-  :deep(.name-column) {
-    width: 35% !important;
-  }
-  
-  :deep(.price-column) {
-    width: 15% !important;
-  }
-  
-  :deep(.category-column) {
-    width: 20% !important;
-  }
-  
-  :deep(.action-column) {
-    width: 80px !important;
-  }
-}
-
-@media screen and (min-width: 769px) and (max-width: 992px) {
-  .menu-table {
-    width: 80%;
-    margin: 0 auto;
-  }
-  
-  :deep(.image-column) {
-    width: 80px !important;
-  }
-  
-  :deep(.name-column) {
-    width: 35% !important;
-  }
-  
-  :deep(.price-column) {
-    width: 15% !important;
-  }
-  
-  :deep(.category-column) {
-    width: 20% !important;
-  }
-  
-  :deep(.action-column) {
-    width: 80px !important;
-  }
-}
-
-@media screen and (min-width: 577px) and (max-width: 768px) {
-  .menu-table {
-    width: 85%;
-    margin: 0 auto;
-  }
-  
-  :deep(.image-column) {
-    width: 70px !important;
-  }
-  
-  :deep(.name-column) {
-    width: 35% !important;
-  }
-  
-  :deep(.price-column) {
-    width: 15% !important;
-  }
-  
-  :deep(.category-column) {
-    width: 20% !important;
-  }
-  
-  :deep(.action-column) {
-    width: 70px !important;
-  }
-}
-
-@media screen and (min-width: 401px) and (max-width: 576px) {
-  .menu-table {
-    width: 90%;
-    margin: 0 auto;
-  }
-  
-  :deep(.image-column) {
-    width: 60px !important;
-  }
-  
-  :deep(.name-column) {
-    width: 35% !important;
-  }
-  
-  :deep(.price-column) {
-    width: 15% !important;
-  }
-  
-  :deep(.category-column) {
-    width: 20% !important;
-  }
-  
-  :deep(.action-column) {
-    width: 60px !important;
-  }
-}
-
-@media screen and (max-width: 400px) {
-  .menu-table {
+  .category-card {
     width: 100%;
-    margin: 0 auto;
-  }
-  
-  :deep(.image-column) {
-    width: 55px !important;
-  }
-  
-  :deep(.name-column) {
-    width: 35% !important;
-  }
-  
-  :deep(.price-column) {
-    width: 15% !important;
-  }
-  
-  :deep(.category-column) {
-    width: 15% !important;
   }
   
   :deep(.action-column) {
-    width: 55px !important;
+    width: 70px !important;
+  }
+}
+
+@media screen and (max-width: 576px) {
+  .category-container {
+    padding: 10px 5px;
+  }
+  
+  .header-title {
+    font-size: 16px;
+  }
+  
+  :deep(.action-column) {
+    width: 60px !important;
+  }
+  
+  :deep(.el-table__row) {
+    height: 50px;
+    font-size: 13px;
   }
 }
 </style>
