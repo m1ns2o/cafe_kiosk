@@ -7,22 +7,24 @@
           <template #header>
             <div class="card-header">주문 목록</div>
           </template>
-          <el-table
-            :data="sortedOrders"
-            style="width: 100%"
-            @row-click="selectOrder"
-            highlight-current-row
-            :row-class-name="rowClassName"
-            :header-cell-style="{ fontSize: '16px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
-            :cell-style="{ fontSize: '15px', height: '60px' }"
-          >
-            <el-table-column prop="id" label="주문번호" width="100" />
-            <el-table-column prop="created_at" label="주문시간" min-width="150">
-              <template #default="scope">
-                {{ formatDate(scope.row.created_at) }}
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="order-list-scroll">
+            <el-table
+              :data="sortedOrders"
+              style="width: 100%"
+              @row-click="selectOrder"
+              highlight-current-row
+              :row-class-name="rowClassName"
+              :header-cell-style="{ fontSize: '16px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
+              :cell-style="{ fontSize: '15px', height: '60px' }"
+            >
+              <el-table-column prop="id" label="주문번호" width="100" />
+              <el-table-column prop="created_at" label="주문시간" min-width="150">
+                <template #default="scope">
+                  {{ formatDate(scope.row.created_at) }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-card>
       </el-col>
 
@@ -135,10 +137,11 @@ onMounted(() => {
 .order-container {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   width: 100%;
   min-height: 80vh;
   padding: 20px;
+  position: relative;
 }
 
 .order-content {
@@ -152,6 +155,22 @@ onMounted(() => {
   margin-bottom: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
+}
+
+.order-list-scroll {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.order-list-scroll::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* 주문 상세 카드 고정 스타일 */
+.el-col:nth-child(2) {
+  position: sticky;
+  top: 20px;
 }
 
 .card-header {
@@ -196,10 +215,19 @@ onMounted(() => {
   padding: 8px 12px;
 }
 
+:deep(.el-table__body-wrapper::-webkit-scrollbar) {
+  display: none;
+}
+
+:deep(.el-table__body-wrapper) {
+  scrollbar-width: none;
+}
+
 /* 모바일 반응형 스타일 */
 @media (max-width: 768px) {
   .order-container {
     padding: 10px;
+    flex-direction: column;
   }
   
   .el-row {
@@ -210,6 +238,15 @@ onMounted(() => {
   .el-col {
     width: 100%;
     max-width: 100%;
+  }
+  
+  .el-col:nth-child(2) {
+    position: relative;
+    top: 0;
+  }
+  
+  .order-list-scroll {
+    max-height: 400px;
   }
   
   .order-total {
