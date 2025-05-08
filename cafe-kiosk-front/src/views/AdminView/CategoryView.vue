@@ -9,7 +9,7 @@
       class="menu-table"
     >
       <!-- 메뉴 이름 열 -->
-      <el-table-column prop="name" label="메뉴명" class-name="name-column" align="left" />
+      <el-table-column prop="name" label="카테고리" class-name="name-column" align="left" />
       <!-- 작업 열 -->
       <el-table-column label="" class-name="action-column" align="right">
         <template #default="scope">

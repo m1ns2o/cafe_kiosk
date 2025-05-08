@@ -54,6 +54,7 @@
         :filters="categoryFilters"
         :filter-method="filterByCategory"
         filter-placement="bottom-end"
+        @filter-change="onFilterChange"
       >
         <template #default="scope">
           <span>{{ getCategoryName(scope.row.category_id) }}</span>
@@ -114,16 +115,13 @@ const currentPage = ref(1)
 const pageSize = ref(8) // 페이지당 8개 항목
 
 // 필터링된 테이블 데이터 (카테고리 필터 적용)
+const categoryFilterValue = ref<number[] | null>(null)
+
 const filteredTableData = computed(() => {
-  if (!tableRef.value) return tableData.value
-  
-  // 테이블의 필터 상태를 확인하여 필터링된 데이터 반환
-  const filters = tableRef.value.filters
-  if (filters && Object.keys(filters).length > 0 && filters.category_id && filters.category_id.length > 0) {
-    return tableData.value.filter(row => filters.category_id.includes(row.category_id))
+  if (!categoryFilterValue.value || categoryFilterValue.value.length === 0) {
+    return tableData.value
   }
-  
-  return tableData.value
+  return tableData.value.filter(row => categoryFilterValue.value!.includes(row.category_id))
 })
 
 // 현재 페이지에 표시할 데이터
@@ -178,6 +176,11 @@ const getCategoryName = (categoryId: number): string => {
 // 카테고리 필터링
 const filterByCategory = (value: number, row: MenuItem) => {
   return row.category_id === value
+}
+
+// 필터 변경 이벤트 핸들러
+const onFilterChange = (filters: Record<string, any>) => {
+  categoryFilterValue.value = filters.category_id || []
 }
 
 // 페이지 변경 처리
