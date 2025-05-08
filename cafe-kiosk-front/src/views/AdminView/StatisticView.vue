@@ -8,47 +8,49 @@
             <div class="card-header">판매 통계</div>
           </template>
           
-          <!-- 항목별 판매비율 파이차트 -->
-          <div class="chart-container">
-            <h3 class="chart-title">항목별 판매비율</h3>
-            <div class="pie-chart-wrapper">
-              <div v-if="isLoading" class="chart-loading">
-                <el-skeleton animated :rows="5" />
-              </div>
-              <div v-else-if="menuSalesData.labels.length === 0" class="chart-empty">
-                <el-empty description="판매 데이터가 없습니다." />
-              </div>
-              <div v-else class="chart-container-inner">
-                <canvas ref="pieChartRef"></canvas>
-              </div>
-            </div>
-          </div>
-          
-          <!-- 최근 이틀 매출 바차트 -->
-          <div class="chart-container">
-            <h3 class="chart-title">최근 이틀 매출</h3>
-            <div class="bar-chart-wrapper">
-              <div v-if="isLoading" class="chart-loading">
-                <el-skeleton animated :rows="5" />
-              </div>
-              <div v-else-if="dailySalesData.labels.length === 0" class="chart-empty">
-                <el-empty description="매출 데이터가 없습니다." />
-              </div>
-              <div v-else class="chart-container-inner">
-                <canvas ref="barChartRef"></canvas>
+          <div class="statistics-card-content">
+            <!-- 항목별 판매비율 파이차트 -->
+            <div class="chart-container pie-container">
+              <h3 class="chart-title">항목별 판매비율</h3>
+              <div class="chart-wrapper pie-chart-wrapper">
+                <div v-if="isLoading" class="chart-loading">
+                  <el-skeleton animated :rows="3" />
+                </div>
+                <div v-else-if="menuSalesData.labels.length === 0" class="chart-empty">
+                  <el-empty description="판매 데이터가 없습니다." />
+                </div>
+                <div v-else class="chart-container-inner">
+                  <canvas ref="pieChartRef"></canvas>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <!-- 총 매출 -->
-          <div class="total-sales-container">
-            <div class="total-sales-card">
-              <h3 class="total-sales-title">총 매출</h3>
-              <div v-if="isLoading" class="total-loading">
-                <el-skeleton animated :rows="1" />
+            
+            <!-- 최근 이틀 매출 바차트 -->
+            <div class="chart-container bar-container">
+              <h3 class="chart-title">최근 이틀 매출</h3>
+              <div class="chart-wrapper bar-chart-wrapper">
+                <div v-if="isLoading" class="chart-loading">
+                  <el-skeleton animated :rows="3" />
+                </div>
+                <div v-else-if="dailySalesData.labels.length === 0" class="chart-empty">
+                  <el-empty description="매출 데이터가 없습니다." />
+                </div>
+                <div v-else class="chart-container-inner">
+                  <canvas ref="barChartRef"></canvas>
+                </div>
               </div>
-              <div v-else class="total-sales-amount">
-                {{ totalSales.toLocaleString() }}원
+            </div>
+            
+            <!-- 총 매출 -->
+            <div class="total-sales-container">
+              <div class="total-sales-card">
+                <h3 class="total-sales-title">총 매출</h3>
+                <div v-if="isLoading" class="total-loading">
+                  <el-skeleton animated :rows="1" />
+                </div>
+                <div v-else class="total-sales-amount">
+                  {{ totalSales.toLocaleString() }}원
+                </div>
               </div>
             </div>
           </div>
@@ -69,7 +71,7 @@
                 end-placeholder="종료일"
                 format="YYYY-MM-DD"
                 size="small"
-                style="width: 240px; margin-left: 10px;"
+                style="width: 200px; margin-left: 10px;"
                 @change="fetchOrderHistory"
               />
             </div>
@@ -90,8 +92,8 @@
               :header-cell-style="{ fontSize: '15px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
               :cell-style="{ fontSize: '14px', height: '50px' }"
             >
-              <el-table-column prop="id" label="주문번호" width="100" />
-              <el-table-column prop="created_at" label="주문시간" min-width="180">
+              <el-table-column prop="id" label="주문번호" width="80" align="center"/>
+              <el-table-column prop="created_at" label="주문시간" min-width="80">
                 <template #default="scope">
                   {{ formatDateTime(scope.row.created_at) }}
                 </template>
@@ -110,10 +112,28 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { getOrders } from '../../api/orderApi';
 import type { Order, OrderItem } from '../../api/orderApi';
 import Chart from 'chart.js/auto';
+
+// 화면 크기 상태
+const windowWidth = ref(window.innerWidth);
+const windowHeight = ref(window.innerHeight);
+
+// 차트 크기 계산
+const getChartHeight = computed(() => {
+  // 화면 높이에 따라 동적으로 차트 높이 계산
+  const baseHeight = windowHeight.value;
+  
+  if (baseHeight < 600) {
+    return 180; // 작은 화면
+  } else if (baseHeight < 800) {
+    return 220; // 중간 화면
+  } else {
+    return 250; // 큰 화면
+  }
+});
 
 // 상태 변수
 const isLoading = ref(true);
@@ -140,7 +160,7 @@ const dailySalesData = ref({
   datasets: [{
     label: '매출',
     data: [] as number[],
-    backgroundColor: '#82ca9d',
+    backgroundColor: '#78A1BB',
   }]
 });
 
@@ -159,6 +179,21 @@ const COLORS = [
   '#8495A8', // 진한 블루-그레이
   '#6E7F91'  // 어두운 블루-그레이
 ];
+
+// 화면 크기 변경 감지 함수
+function handleResize() {
+  windowWidth.value = window.innerWidth;
+  windowHeight.value = window.innerHeight;
+  
+  // 차트 다시 그리기 - 약간의 지연을 줘서 DOM이 업데이트된 후 실행
+  if (!isLoading.value) {
+    nextTick(() => {
+      setTimeout(() => {
+        createOrUpdateCharts();
+      }, 100);
+    });
+  }
+}
 
 // 날짜 포맷 함수
 function formatDateTime(dateStr: string): string {
@@ -344,10 +379,11 @@ function createOrUpdateCharts(): void {
         maintainAspectRatio: false, // 컨테이너에 맞게 크기 조정
         plugins: {
           legend: {
-            position: 'right',
+            position: windowWidth.value < 768 ? 'bottom' : 'right', // 화면 크기에 따라 범례 위치 변경
             labels: {
+              boxWidth: windowWidth.value < 768 ? 10 : 12, // 화면 크기에 따라 범례 크기 조정
               font: {
-                size: 12
+                size: windowWidth.value < 768 ? 10 : 12
               }
             }
           },
@@ -387,12 +423,23 @@ function createOrUpdateCharts(): void {
             ticks: {
               callback: function(value) {
                 return value.toLocaleString() + '원';
+              },
+              font: {
+                size: windowWidth.value < 768 ? 10 : 12
+              }
+            }
+          },
+          x: {
+            ticks: {
+              font: {
+                size: windowWidth.value < 768 ? 10 : 12
               }
             }
           }
         },
         plugins: {
           legend: {
+            display: windowWidth.value >= 768, // 작은 화면에서는 범례 숨김
             labels: {
               font: {
                 size: 12
@@ -417,12 +464,27 @@ function createOrUpdateCharts(): void {
               '바차트:', barChart ? 'O' : 'X');
 }
 
-// 컴포넌트 마운트 시 데이터 로드
+// 일정 시간 후에만 리사이즈 이벤트 실행 (디바운스)
+let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+function debouncedResize() {
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout);
+  }
+  resizeTimeout = setTimeout(() => {
+    handleResize();
+  }, 200);
+}
+
+// 컴포넌트 마운트 시 데이터 로드 및 이벤트 리스너 등록
 onMounted(() => {
   fetchOrderHistory();
+  window.addEventListener('resize', debouncedResize);
+  
+  // 초기 화면 크기 설정
+  handleResize();
 });
 
-// 컴포넌트 언마운트 시 차트 인스턴스 제거
+// 컴포넌트 언마운트 시 차트 인스턴스 제거 및 이벤트 리스너 해제
 onUnmounted(() => {
   if (pieChart) {
     pieChart.destroy();
@@ -433,10 +495,31 @@ onUnmounted(() => {
     barChart.destroy();
     barChart = null;
   }
+  
+  window.removeEventListener('resize', debouncedResize);
+  
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout);
+  }
+});
+
+// 화면 크기 변경 시 차트 높이 자동 조정
+watch(getChartHeight, () => {
+  const pieWrapper = document.querySelector('.pie-chart-wrapper') as HTMLElement;
+  const barWrapper = document.querySelector('.bar-chart-wrapper') as HTMLElement;
+  
+  if (pieWrapper) {
+    pieWrapper.style.height = `${getChartHeight.value}px`;
+  }
+  
+  if (barWrapper) {
+    barWrapper.style.height = `${getChartHeight.value}px`;
+  }
 });
 </script>
 
 <style scoped>
+
 .statistics-container {
   display: flex;
   justify-content: center;
@@ -470,6 +553,13 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+.statistics-card-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: auto;
+}
+
 :deep(.el-card__body) {
   flex: 1;
   overflow: auto;
@@ -486,25 +576,37 @@ onUnmounted(() => {
 }
 
 .chart-container {
-  margin-bottom: 20px; /* 30px에서 20px로 줄임 */
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+.pie-container, .bar-container {
+  flex: 1;
+  min-height: 0; /* 중요: flexbox에서 오버플로우를 방지 */
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-title {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 10px; /* 15px에서 10px로 줄임 */
+  margin-bottom: 8px;
   color: #606266;
+}
+
+.chart-wrapper {
+  flex: 1;
+  overflow: hidden;
+  background-color: #f8f9fb;
+  border-radius: 8px;
+  padding: 10px;
+  position: relative;
+  min-height: 0; /* 중요: flexbox에서 오버플로우를 방지 */
 }
 
 .pie-chart-wrapper,
 .bar-chart-wrapper {
-  height: 250px; /* 300px에서 250px로 줄임 */
-  width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  background-color: #f8f9fb;
-  padding: 10px;
-  position: relative;
+  transition: height 0.3s ease; /* 높이 변경 시 애니메이션 효과 */
 }
 
 .chart-container-inner {
@@ -514,11 +616,12 @@ onUnmounted(() => {
 }
 
 .total-sales-container {
-  /* margin-top: 5px; 새로 추가: 위 여백 줄임 */
+  margin-top: 5px;
   padding: 10px;
   background-color: #f0f9ff;
   border-radius: 8px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .total-sales-card {
@@ -531,7 +634,7 @@ onUnmounted(() => {
 .total-sales-title {
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 10px; /* 15px에서 10px로 줄임 */
+  margin-bottom: 10px;
   color: #303133;
 }
 
@@ -544,7 +647,7 @@ onUnmounted(() => {
 .order-table-wrapper {
   flex: 1;
   position: relative;
-  min-height: 400px;
+  min-height: 400px; /* 고정된 최소 높이로 복구 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -556,10 +659,11 @@ onUnmounted(() => {
   overflow: auto;
 }
 
+
 .chart-loading,
 .table-loading,
 .total-loading {
-  padding: 20px;
+  padding: 15px;
 }
 
 .chart-empty,
@@ -568,7 +672,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 40px 0;
+  padding: 20px 0;
 }
 
 /* 모바일 반응형 스타일 */
@@ -578,9 +682,32 @@ onUnmounted(() => {
     height: auto;
   }
   
+  .statistics-content {
+    height: auto;
+  }
+  
+  .chart-container {
+    margin-bottom: 10px;
+  }
+  
   .card-header {
     flex-direction: column;
     align-items: flex-start;
+    font-size: 16px;
+  }
+  
+  .chart-title {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  
+  .total-sales-title {
+    font-size: 16px;
+    margin-bottom: 5px;
+  }
+  
+  .total-sales-amount {
+    font-size: 24px;
   }
   
   .el-date-picker {
@@ -589,13 +716,25 @@ onUnmounted(() => {
     width: 100% !important;
   }
   
-  .pie-chart-wrapper,
-  .bar-chart-wrapper {
-    height: 220px; /* 모바일에서 더 작게 */
+  /* 모바일에서의 차트 컨테이너 크기는 computed 속성으로 동적 조절 */
+}
+
+/* 화면 높이가 매우 낮을 때 (작은 디스플레이) */
+@media (max-height: 600px) {
+  .chart-container {
+    margin-bottom: 8px;
   }
   
-  .total-amount {
-    font-size: 24px;
+  .chart-title {
+    margin-bottom: 3px;
+  }
+  
+  .total-sales-container {
+    padding: 5px;
+  }
+  
+  .total-sales-title {
+    margin-bottom: 3px;
   }
 }
 </style>
