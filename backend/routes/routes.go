@@ -1,9 +1,10 @@
 package routes
 
 import (
-    "github.com/gin-gonic/gin"
-    "github.com/gin-contrib/cors"
-    "kiosk/handlers"
+	"kiosk/handlers"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func SetupRoutes(r *gin.Engine) {
@@ -37,5 +38,6 @@ func SetupRoutes(r *gin.Engine) {
         // 결제 관련
         // api.POST("/payment", handlers.ProcessPayment)
         api.GET("/ws/payment", handlers.PaymentHandler)
+        api.GET("/orders/stream", handlers.OrdersEventStream)
     }
 }

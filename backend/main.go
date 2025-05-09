@@ -74,6 +74,7 @@ func main() {
 
 	// Gin 라우터 설정
 	r := gin.Default()
+    handlers.StartSSEBroadcaster()
 
 	// KIS API 클라이언트와 DepositState를 라우터 컨텍스트에 저장
 	r.Use(func(c *gin.Context) {

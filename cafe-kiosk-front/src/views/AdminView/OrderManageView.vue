@@ -91,7 +91,7 @@ const selectedOrderId = ref<number | null>(null);
 const orderTable = ref<InstanceType<typeof ElTable> | null>(null);
 const previousOrderIds = ref<number[]>([]);
 const isFirstLoad = ref(true);
-let pollingInterval: number | null = null;
+let eventSource: EventSource | null = null;
 
 const sortedOrders = computed(() => {
   return [...orders.value].sort((a, b) =>
@@ -107,58 +107,100 @@ const selectedOrderItems = computed(() =>
   selectedOrder.value ? selectedOrder.value.order_items : []
 );
 
-async function fetchOrders(): Promise<void> {
+// 초기 주문 목록 로드
+async function fetchInitialOrders(): Promise<void> {
   try {
     const newOrders = await getOrders();
-    
-    // 첫 로드가 아닌 경우에만 새 주문 알림 처리
-    if (!isFirstLoad.value) {
-      // 새로운 주문이 있는지 확인
-      const newOrderIds = newOrders.map(order => order.id);
-      const currentOrderIds = orders.value.map(order => order.id);
-      
-      // 새로운 주문들 (현재 목록에 없는 ID를 가진 주문들)
-      const addedOrders = newOrders.filter(order => !currentOrderIds.includes(order.id));
-      
-      // 새로운 주문이 있으면 알림 표시 및 첫 번째 새 주문 선택
-      if (addedOrders.length > 0) {
-        showNewOrderNotification(addedOrders);
-        
-        // 새 주문 중 가장 최근 것을 선택
-        const latestNewOrder = addedOrders.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        )[0];
-        
-        selectedOrderId.value = latestNewOrder.id;
-        
-        // 테이블에서 해당 주문으로 스크롤
-        nextTick(() => {
-          scrollToSelectedOrder();
-        });
-      }
-      
-      // 이전 주문 ID 목록 업데이트
-      previousOrderIds.value = newOrderIds;
-    } else {
-      // 첫 로드인 경우
-      // 주문이 있으면 첫 번째 주문 선택
-      // if (newOrders.length > 0) {
-      //   selectedOrderId.value = newOrders[0].id;
-      // }
-      
-      // 이전 주문 ID 목록 초기화
-      previousOrderIds.value = newOrders.map(order => order.id);
-      
-      // 첫 로드 완료 표시
-      isFirstLoad.value = false;
-    }
-    
-    // 주문 목록 업데이트 (첫 로드 여부와 관계없이 항상 실행)
     orders.value = newOrders;
+    
+    // 주문이 있으면 첫 번째 주문 선택 (옵션)
+    // if (newOrders.length > 0) {
+    //   selectedOrderId.value = newOrders[0].id;
+    // }
+    
+    // 이전 주문 ID 목록 초기화
+    previousOrderIds.value = newOrders.map(order => order.id);
+    
+    // 첫 로드 완료 표시
+    isFirstLoad.value = false;
     
   } catch (error) {
     console.error('주문 목록을 불러오는데 실패했습니다:', error);
   }
+}
+
+// SSE 연결 설정
+function setupSSEConnection(): void {
+  // 기존 연결이 있으면 닫기
+  if (eventSource !== null) {
+    eventSource.close();
+  }
+  
+  // SSE 연결 생성
+  eventSource = new EventSource('http://localhost:8080/api/orders/stream');
+  
+  // 연결 수립 이벤트
+  eventSource.onopen = (event) => {
+    console.log('SSE 연결이 수립되었습니다.');
+  };
+  
+  // 메시지 수신 이벤트
+  eventSource.onmessage = (event) => {
+    try {
+      // 수신된 주문 데이터 파싱
+      const order = JSON.parse(event.data);
+      
+      // 새 주문인지 확인
+      const isNewOrder = !previousOrderIds.value.includes(order.id);
+      
+      // 기존 주문 업데이트 또는 새 주문 추가
+      const orderIndex = orders.value.findIndex(o => o.id === order.id);
+      
+      if (orderIndex !== -1) {
+        // 기존 주문 업데이트
+        orders.value[orderIndex] = order;
+      } else {
+        // 새 주문 추가
+        orders.value.push(order);
+        
+        // 새 주문 알림 표시
+        if (!isFirstLoad.value && isNewOrder) {
+          showNewOrderNotification([order]);
+          
+          // 새 주문 선택 및 스크롤
+          selectedOrderId.value = order.id;
+          nextTick(() => {
+            scrollToSelectedOrder();
+          });
+        }
+      }
+      
+      // 이전 주문 ID 목록 업데이트
+      if (isNewOrder) {
+        previousOrderIds.value.push(order.id);
+      }
+      
+    } catch (error) {
+      console.error('SSE 메시지 처리 중 오류 발생:', error);
+    }
+  };
+  
+  // 에러 처리
+  eventSource.onerror = (error) => {
+    console.error('SSE 연결 오류:', error);
+    
+    // 연결 종료
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    
+    // 3초 후 재연결 시도
+    setTimeout(() => {
+      console.log('SSE 재연결 시도...');
+      setupSSEConnection();
+    }, 3000);
+  };
 }
 
 function showNewOrderNotification(newOrders: Order[]): void {
@@ -206,28 +248,20 @@ function formatDate(dateStr: string): string {
   });
 }
 
-// 1초마다 주문 업데이트 폴링 시작
-function startPolling(): void {
-  if (!pollingInterval) {
-    fetchOrders(); // 즉시 첫 번째 데이터 로드 (isFirstLoad가 true인 상태)
-    pollingInterval = window.setInterval(fetchOrders, 1000);
-  }
-}
-
-// 폴링 중지 (컴포넌트 언마운트 시)
-function stopPolling(): void {
-  if (pollingInterval) {
-    clearInterval(pollingInterval);
-    pollingInterval = null;
-  }
-}
-
 onMounted(() => {
-  startPolling();
+  // 초기 주문 목록 로드 후 SSE 연결 설정
+  fetchInitialOrders().then(() => {
+    setupSSEConnection();
+  });
 });
 
 onUnmounted(() => {
-  stopPolling();
+  // 컴포넌트 언마운트 시 SSE 연결 종료
+  if (eventSource) {
+    console.log('SSE 연결 종료');
+    eventSource.close();
+    eventSource = null;
+  }
 });
 </script>
 
