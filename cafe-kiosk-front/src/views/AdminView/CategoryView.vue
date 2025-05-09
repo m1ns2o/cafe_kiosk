@@ -196,7 +196,7 @@ const handleAdd = () => {
 }
 
 // 수정 핸들러
-const handleEdit = (index: number, row: Category) => {
+const handleEdit = (_index: number, row: Category) => {
   dialogType.value = 'edit'
   categoryForm.id = row.id
   categoryForm.name = row.name
@@ -226,7 +226,7 @@ const submitForm = async () => {
           ElMessage.success('카테고리가 추가되었습니다.')
         } else {
           // 두 번째 매개변수를 객체로 전달
-          await CategoryAPI.updateCategory(categoryForm.id, { name: categoryForm.name })
+          await CategoryAPI.updateCategory(categoryForm.id, categoryForm.name)
           ElMessage.success('카테고리가 수정되었습니다.')
         }
         

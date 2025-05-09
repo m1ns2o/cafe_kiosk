@@ -30,8 +30,8 @@ export const CategoryAPI = {
 
   // 카테고리 수정
   updateCategory: (id: number, name: string) => {
-    console.log('updateCategory API 호출 (문자열 직접):', id, name);
-    return apiClient.put<Category>(`/categories/${id}`, name);
+    // console.log('updateCategory API 호출 (객체로 전달):', id, name);
+    return apiClient.put<Category>(`/categories/${id}`, { name });
   },
 };
 

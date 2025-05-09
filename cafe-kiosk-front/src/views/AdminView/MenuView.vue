@@ -404,7 +404,7 @@ const handleAdd = () => {
 }
 
 // 수정 핸들러
-const handleEdit = (index: number, row: MenuItem) => {
+const handleEdit = (_index: number, row: MenuItem) => {
   dialogType.value = 'edit'
   
   // 폼 데이터 설정
@@ -446,7 +446,7 @@ const handleImageChange = (file: UploadFile) => {
 }
 
 // 이미지 개수 초과 핸들러
-const handleExceed = (files: File[]) => {
+const handleExceed = () => {
   ElMessage.warning('이미지는 하나만 선택할 수 있습니다.')
 }
 
@@ -461,12 +461,6 @@ const handleImageRemove = (file: UploadFile) => {
 const previewImage = (file: UploadFile) => {
   previewImageUrl.value = file.url || ''
   previewVisible.value = true
-}
-
-// 현재 이미지 삭제
-const removeCurrentImage = () => {
-  menuForm.image_url = ''
-  ElMessage.info('현재 이미지가 삭제되었습니다. 저장 시 반영됩니다.')
 }
 
 // 폼 제출 처리
@@ -517,9 +511,6 @@ const submitForm = async () => {
         await fetchData()
       } catch (error) {
         console.error('API 오류 세부 정보:', error)
-        if (error.response) {
-          console.error('응답 데이터:', error.response.data)
-        }
         handleApiError(error, `메뉴를 ${dialogType.value === 'add' ? '추가' : '수정'}하는 중 오류가 발생했습니다`)
       } finally {
         submitLoading.value = false
