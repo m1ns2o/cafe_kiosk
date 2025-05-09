@@ -114,7 +114,7 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { getOrders } from '../../api/orderApi';
-import type { Order, OrderItem } from '../../api/orderApi';
+import type { Order } from '../../api/orderApi';
 import Chart from 'chart.js/auto';
 
 // 화면 크기 상태

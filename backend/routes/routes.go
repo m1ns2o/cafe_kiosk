@@ -18,6 +18,7 @@ func SetupRoutes(r *gin.Engine) {
         api.GET("/categories", handlers.GetCategories)
         api.GET("/categories/:id", handlers.GetCategory)
         api.POST("/categories", handlers.CreateCategory)  // 카테고리 추가
+        api.PUT("/categories/:id", handlers.UpdateCategory)  // 카테고리 업데이트
         api.DELETE("/categories/:id", handlers.DeleteCategory)  // 카테고리 삭제
         api.GET("/categories/:id/menus", handlers.GetMenusByCategory)
 

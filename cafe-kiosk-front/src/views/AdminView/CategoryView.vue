@@ -5,7 +5,16 @@
         <template #header>
           <div class="card-header">
             <span class="header-title">카테고리 관리</span>
-            <!-- 필요한 경우 여기에 추가 버튼 등을 배치할 수 있습니다 -->
+            <!-- 추가 버튼 -->
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="handleAdd"
+              class="add-button"
+            >
+              <el-icon class="el-icon--left" style="color: white;"><Plus /></el-icon>
+              항목 추가
+            </el-button>
           </div>
         </template>
         
@@ -58,19 +67,70 @@
       </el-card>
     </div>
   </div>
+
+  <!-- 카테고리 추가/편집 다이얼로그 -->
+  <el-dialog
+    v-model="dialogVisible"
+    :title="dialogType === 'add' ? '카테고리 추가' : '카테고리 편집'"
+    width="30%"
+    :close-on-click-modal="false"
+    @close="resetForm"
+  >
+    <el-form 
+      ref="formRef" 
+      :model="categoryForm" 
+      :rules="rules" 
+      label-width="100px"
+      label-position="top"
+    >
+      <el-form-item label="카테고리 이름" prop="name">
+        <el-input 
+          v-model="categoryForm.name" 
+          placeholder="카테고리 이름을 입력하세요" 
+          clearable
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="dialogVisible = false">취소</el-button>
+        <el-button 
+          type="primary" 
+          @click="submitForm" 
+          :loading="submitLoading"
+        >
+          {{ dialogType === 'add' ? '추가' : '저장' }}
+        </el-button>
+      </span>
+    </template>
+  </el-dialog>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, reactive } from 'vue'
+import { Edit, Delete, Plus } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import type { TableInstance } from 'element-plus'
+import type { TableInstance, FormInstance, FormRules } from 'element-plus'
 import { CategoryAPI } from '../../api/menu'
 import type { Category } from '../../types/menuType'
+
+// API 요청 시 에러 처리를 위한 유틸리티 함수
+const handleApiError = (error: any, message: string) => {
+  console.error(message, error)
+  let errorMessage = message
+  
+  // API 응답에서 오류 메시지가 있으면 추가
+  if (error.response && error.response.data && error.response.data.message) {
+    errorMessage += `: ${error.response.data.message}`
+  }
+  
+  ElMessage.error(errorMessage)
+}
 
 const tableRef = ref<TableInstance>()
 const tableData = ref<Category[]>([])
 const loading = ref(false)
+const submitLoading = ref(false)
 
 // 페이지네이션 관련 변수
 const currentPage = ref(1)
@@ -86,6 +146,23 @@ const pagedTableData = computed(() => {
   return filteredTableData.value.slice(startIndex, endIndex)
 })
 
+// 다이얼로그 관련 변수
+const dialogVisible = ref(false)
+const dialogType = ref<'add' | 'edit'>('add')
+const formRef = ref<FormInstance>()
+const categoryForm = reactive({
+  id: 0,
+  name: ''
+})
+
+// 폼 검증 규칙
+const rules = reactive<FormRules>({
+  name: [
+    { required: true, message: '카테고리 이름을 입력해주세요', trigger: 'blur' },
+    { min: 1, max: 50, message: '카테고리 이름은 1-50자 이내로 입력해주세요', trigger: 'blur' }
+  ]
+})
+
 // 컴포넌트 마운트 시 데이터 로드
 onMounted(async () => {
   await fetchData()
@@ -95,11 +172,12 @@ onMounted(async () => {
 const fetchData = async () => {
   loading.value = true;
   try {
-    const categoryResponse = await CategoryAPI.getAllCategories();
-    tableData.value = categoryResponse.data;
+    const response = await CategoryAPI.getAllCategories();
+    if (response && response.data) {
+      tableData.value = response.data;
+    }
   } catch (error) {
-    console.error('카테고리 데이터 로딩 오류:', error);
-    ElMessage.error('카테고리 데이터를 불러오는 중 오류가 발생했습니다.');
+    handleApiError(error, '카테고리 데이터를 불러오는 중 오류가 발생했습니다');
   } finally {
     loading.value = false;
   }
@@ -110,10 +188,57 @@ const handleCurrentChange = (val: number) => {
   currentPage.value = val
 }
 
+// 추가 버튼 핸들러
+const handleAdd = () => {
+  dialogType.value = 'add'
+  resetForm()
+  dialogVisible.value = true
+}
+
 // 수정 핸들러
 const handleEdit = (index: number, row: Category) => {
-  console.log('수정:', index, row)
-  // 여기에서 수정 기능을 구현하거나 부모 컴포넌트에 이벤트를 발생시킵니다
+  dialogType.value = 'edit'
+  categoryForm.id = row.id
+  categoryForm.name = row.name
+  dialogVisible.value = true
+}
+
+// 폼 초기화
+const resetForm = () => {
+  if (formRef.value) {
+    formRef.value.resetFields()
+  }
+  categoryForm.id = 0
+  categoryForm.name = ''
+}
+
+// 폼 제출 처리
+const submitForm = async () => {
+  if (!formRef.value) return
+  
+  await formRef.value.validate(async (valid) => {
+    if (valid) {
+      submitLoading.value = true
+      try {
+        if (dialogType.value === 'add') {
+          // 객체가 아닌 문자열로 name을 전달
+          await CategoryAPI.createCategory(categoryForm.name)
+          ElMessage.success('카테고리가 추가되었습니다.')
+        } else {
+          // 두 번째 매개변수를 객체로 전달
+          await CategoryAPI.updateCategory(categoryForm.id, { name: categoryForm.name })
+          ElMessage.success('카테고리가 수정되었습니다.')
+        }
+        
+        dialogVisible.value = false
+        await fetchData()
+      } catch (error) {
+        handleApiError(error, `카테고리를 ${dialogType.value === 'add' ? '추가' : '수정'}하는 중 오류가 발생했습니다`)
+      } finally {
+        submitLoading.value = false
+      }
+    }
+  })
 }
 
 // 삭제 확인 다이얼로그
@@ -144,8 +269,7 @@ const deleteCategory = async (id: number) => {
     // 카테고리 목록 새로고침
     await fetchData()
   } catch (error) {
-    console.error('카테고리 삭제 오류:', error)
-    ElMessage.error('카테고리 삭제 중 오류가 발생했습니다.')
+    handleApiError(error, '카테고리 삭제 중 오류가 발생했습니다')
   } finally {
     loading.value = false
   }
@@ -190,6 +314,15 @@ const deleteCategory = async (id: number) => {
   font-size: 18px;
 }
 
+.add-button {
+  margin-left: auto;
+}
+
+.add-button :deep(.el-icon) {
+  color: white;
+}
+
+
 .category-table {
   width: 100%;
   margin-bottom: 10px;
@@ -217,8 +350,6 @@ const deleteCategory = async (id: number) => {
   height: 60px;
   font-size: 14px;
 }
-
-
 
 /* 개선된 컬럼 너비 설정 */
 :deep(.name-column) {
@@ -270,6 +401,14 @@ const deleteCategory = async (id: number) => {
   color: #e41e1e; /* Darker red on hover */
 }
 
+/* 다이얼로그 스타일 */
+.dialog-footer {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 /* 미디어 쿼리 */
 @media screen and (max-width: 768px) {
   .category-container {
@@ -283,6 +422,10 @@ const deleteCategory = async (id: number) => {
   :deep(.action-column) {
     width: 70px !important;
   }
+  
+  .header-title {
+    font-size: 16px;
+  }
 }
 
 @media screen and (max-width: 576px) {
@@ -294,6 +437,11 @@ const deleteCategory = async (id: number) => {
     font-size: 16px;
   }
   
+  .add-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  
   :deep(.action-column) {
     width: 60px !important;
   }
@@ -301,6 +449,11 @@ const deleteCategory = async (id: number) => {
   :deep(.el-table__row) {
     height: 50px;
     font-size: 13px;
+  }
+  
+  .el-dialog {
+    width: 90% !important;
+    max-width: 320px;
   }
 }
 </style>

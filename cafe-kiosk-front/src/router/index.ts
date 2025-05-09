@@ -36,11 +36,10 @@ const routes = [
     component: AdminView,
     // 관리자 페이지 중첩 라우트 설정
     children: [
-      // {
-      //   path: '', // /admin으로 접근 시 기본 대시보드 페이지로 리다이렉트
-      //   name: 'AdminDashboard',
-      //   component: AdminDashboard
-      // },
+      {
+        path: '', // /admin으로 접근 시 기본 대시보드 페이지로 리다이렉트
+        redirect: '/admin/statistics'
+      },
       {
         path: 'statistics', // /admin/statistics
         name: 'AdminStatistics',

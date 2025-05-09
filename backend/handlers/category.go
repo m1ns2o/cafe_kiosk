@@ -57,6 +57,34 @@ func CreateCategory(c *gin.Context) {
     c.JSON(http.StatusCreated, category)
 }
 
+
+
+// 카테고리 수정 (PUT)
+func UpdateCategory(c *gin.Context) {
+    id := c.Param("id")
+    var req struct {
+        Name string `json:"name" binding:"required"`
+    }
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    var category models.Category
+    if err := database.DB.First(&category, id).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+        return
+    }
+
+    category.Name = req.Name
+    if err := database.DB.Save(&category).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    c.JSON(http.StatusOK, category)
+}
+
 // 카테고리 삭제
 func DeleteCategory(c *gin.Context) {
     id := c.Param("id")
