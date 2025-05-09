@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import About from '../views/About.vue'
 import OrderView from '../views/OrderView.vue'
 import PaymentView from '../views/PaymentView.vue'
 import PaymentSuccessView from '../views/PaymentSuccessView.vue'
@@ -10,11 +9,6 @@ import OrderManageView from '../views/AdminView/OrderManageView.vue'
 import StatisticView from '../views/AdminView/StatisticView.vue'
 
 const routes = [
-  {
-    path: '/about',
-    name: 'About',
-    component: About
-  },
   {
     path: '/',
     name: 'OrderView',

@@ -35,6 +35,7 @@ func SetupRoutes(r *gin.Engine) {
         api.POST("/orders", handlers.CreateOrder)
 
         // 결제 관련
-        api.POST("/payment", handlers.ProcessPayment)
+        // api.POST("/payment", handlers.ProcessPayment)
+        api.GET("/ws/payment", handlers.PaymentHandler)
     }
 }

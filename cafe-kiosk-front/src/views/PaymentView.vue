@@ -6,28 +6,191 @@ import type { CartItem } from '../types/menuType';
 import QRCode from 'qrcode';
 
 const route = useRoute();
-const router = useRouter(); // 라우터 활성화
+const router = useRouter();
 
 // 결제 상태
-const paymentStatus = ref<'pending' | 'success' | 'failed'>('pending');
+const paymentStatus = ref<'pending' | 'success' | 'failed' | 'cancelled'>('pending');
 const statusMessage = ref<string>('결제를 진행 중입니다...');
-
+const progressInfo = ref<string>('');
+const paymentAttempt = ref<number>(0);
+const maxAttempts = ref<number>(0);
 
 // QR 코드 관련
 const qrCodeDataUrl = ref<string>('');
 const totalAmount = ref<number>(0);
+const isProcessingCancel = ref<boolean>(false);
 
+// 웹소켓 연결
+const socket = ref<WebSocket | null>(null);
 let redirectTimer: ReturnType<typeof setTimeout>;
 
+// 웹소켓 연결 설정
+const setupWebSocket = () => {
+  // 웹소켓 서버 URL (실제 환경에 맞게 수정해야 함)
+  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/api/ws/payment';
+  socket.value = new WebSocket(wsUrl);
+
+  // 웹소켓 이벤트 핸들러 등록
+  socket.value.onopen = () => {
+    console.log('웹소켓 연결 성공');
+    // 연결 후 결제 요청 전송
+    sendPaymentRequest();
+  };
+
+  socket.value.onmessage = (event) => {
+    handleWebSocketMessage(event);
+  };
+
+  socket.value.onclose = (event) => {
+    console.log('웹소켓 연결 종료:', event);
+  };
+
+  socket.value.onerror = (error) => {
+    console.error('웹소켓 오류:', error);
+    paymentStatus.value = 'failed';
+    statusMessage.value = '결제 서버와 연결 중 오류가 발생했습니다.';
+    
+    // 5초 후 주문 화면으로 이동
+    redirectTimer = setTimeout(() => {
+      router.push({ name: 'OrderView' });
+    }, 5000);
+  };
+};
+
+// 웹소켓 메시지 처리
+const handleWebSocketMessage = (event: MessageEvent) => {
+  try {
+    const message = JSON.parse(event.data);
+    
+    switch (message.type) {
+      case 'payment_status':
+        // 결제 진행 상태 업데이트
+        paymentAttempt.value = message.payload.attempt;
+        maxAttempts.value = message.payload.max_attempts;
+        progressInfo.value = `결제 확인 중... (${paymentAttempt.value}/${maxAttempts.value})`;
+        break;
+        
+      case 'payment_result':
+        // 최종 결제 결과 처리
+        handlePaymentResult(message.payload);
+        break;
+        
+      case 'error':
+        // 오류 처리
+        paymentStatus.value = 'failed';
+        statusMessage.value = message.payload.error || '결제 처리 중 오류가 발생했습니다.';
+        
+        redirectTimer = setTimeout(() => {
+          router.push({ name: 'OrderView' });
+        }, 5000);
+        break;
+        
+      case 'cancel_result':
+        // 취소 결과 처리
+        if (message.payload.success) {
+          paymentStatus.value = 'cancelled';
+          statusMessage.value = '결제가 취소되었습니다.';
+          isProcessingCancel.value = false;
+          
+          // 3초 후 주문 화면으로 이동
+          redirectTimer = setTimeout(() => {
+            router.push({ name: 'OrderView' });
+          }, 3000);
+        } else {
+          isProcessingCancel.value = false;
+          statusMessage.value = message.payload.message || '결제 취소에 실패했습니다.';
+        }
+        break;
+    }
+  } catch (error) {
+    console.error('웹소켓 메시지 파싱 오류:', error);
+  }
+};
+
+// 결제 결과 처리
+const handlePaymentResult = (result: any) => {
+  if (result.success) {
+    paymentStatus.value = 'success';
+    statusMessage.value = '결제가 완료되었습니다!';
+    
+    // 결제 성공 시 주문 데이터를 백엔드로 전송
+    submitOrderToBackend().then(() => {
+      // 성공 페이지로 이동 (지연 추가)
+      setTimeout(() => {
+        router.push({ name: 'PaymentSuccessView' });
+      }, 1000);
+    });
+  } else {
+    paymentStatus.value = 'failed';
+    statusMessage.value = result.message || '결제에 실패했습니다.';
+    
+    redirectTimer = setTimeout(() => {
+      router.push({ name: 'OrderView' });
+    }, 5000);
+  }
+};
+
+// 결제 요청 전송 (웹소켓)
+const sendPaymentRequest = () => {
+  if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+    console.error('웹소켓이 연결되지 않았습니다.');
+    return;
+  }
+  
+  const paymentRequest = {
+    type: 'payment_request',
+    payload: {
+      amount: totalAmount.value,
+      order_id: generateOrderId(), // 주문 ID 생성
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  socket.value.send(JSON.stringify(paymentRequest));
+  console.log('결제 요청 전송 완료');
+};
+
+// 결제 취소 요청 전송 (웹소켓)
+const cancelPayment = () => {
+  if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
+    console.error('웹소켓이 연결되지 않았습니다.');
+    return;
+  }
+  
+  isProcessingCancel.value = true;
+  statusMessage.value = '결제를 취소 중입니다...';
+  
+  const cancelRequest = {
+    type: 'cancel_request',
+    payload: {
+      amount: totalAmount.value,
+      timestamp: new Date().toISOString()
+    }
+  };
+  
+  socket.value.send(JSON.stringify(cancelRequest));
+  console.log('결제 취소 요청 전송 완료');
+};
 
 // 결제 재시도
-const retryPayment = async () => {
+const retryPayment = () => {
   clearTimeout(redirectTimer);
-  console.log('clearTimeout');
   paymentStatus.value = 'pending';
   statusMessage.value = '결제를 다시 시도 중입니다...';
-  // paymentDetails.value = null;
-  await requestPayment();
+  progressInfo.value = '';
+  
+  // 웹소켓이 열려있는지 확인
+  if (socket.value && socket.value.readyState === WebSocket.OPEN) {
+    sendPaymentRequest();
+  } else {
+    // 웹소켓이 닫혀있다면 다시 연결
+    setupWebSocket();
+  }
+};
+
+// 주문 ID 생성 헬퍼 함수
+const generateOrderId = () => {
+  return 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 };
 
 // 주문 데이터를 백엔드로 전송
@@ -42,47 +205,6 @@ const submitOrderToBackend = async () => {
     return false;
   }
 };
-
-// 결제 요청 및 결과 확인
-const requestPayment = async () => {
-  try {
-    const response = await PaymentAPI.requestPayment(totalAmount.value);
-    
-    if (response.data.success) {
-      paymentStatus.value = 'success';
-      statusMessage.value = '결제가 완료되었습니다!';
-      
-      // 결제 성공 시 주문 데이터를 백엔드로 전송
-      await submitOrderToBackend();
-      
-      // 성공 페이지로 이동 (지연 추가)
-      setTimeout(() => {
-        router.push({ name: 'PaymentSuccessView' });
-      }, 1000);
-    } else {
-      paymentStatus.value = 'failed';
-      statusMessage.value = response.data.message || '결제에 실패했습니다.';
-      // paymentDetails.value = response.data.details;
-      redirectTimer = setTimeout(() => {
-        router.push({ name: 'OrderView' });
-      }, 5000);
-    }
-  } catch (error) {
-    console.error('결제 요청 중 오류 발생:', error);
-    paymentStatus.value = 'failed';
-    statusMessage.value = '결제에 실패했습니다.';
-    
-    redirectTimer = setTimeout(() => {
-        router.push({ name: 'OrderView' });
-      }, 5000);
-  }
-};
-
-onBeforeUnmount(() => {
-  if (redirectTimer) {
-    clearTimeout(redirectTimer);
-  }
-});
 
 // QR 코드 생성
 const generateQRCode = async () => {
@@ -124,7 +246,6 @@ const cartItems = computed<CartItem[]>(() => {
   try {
     const decodedData = decodeURIComponent(route.params.cartItems as string);
     const parsedData = JSON.parse(decodedData);
-    // 장바구니 아이템 목록 출력
     console.log('장바구니 아이템:', parsedData);
     return parsedData;
   } catch (error) {
@@ -142,8 +263,21 @@ onMounted(async () => {
   // QR 코드 생성
   await generateQRCode();
   
-  // 결제 요청 시작
-  requestPayment();
+  // 웹소켓 연결 설정
+  setupWebSocket();
+});
+
+onBeforeUnmount(() => {
+  // 타이머 정리
+  if (redirectTimer) {
+    clearTimeout(redirectTimer);
+  }
+  
+  // 웹소켓 연결 종료
+  if (socket.value) {
+    socket.value.close();
+    socket.value = null;
+  }
 });
 </script>
 
@@ -182,9 +316,15 @@ onMounted(async () => {
           <div class="status-icon">
             <span v-if="paymentStatus === 'pending'" class="material-icons">hourglass_empty</span>
             <span v-else-if="paymentStatus === 'success'" class="material-icons">check_circle</span>
+            <span v-else-if="paymentStatus === 'cancelled'" class="material-icons">cancel</span>
             <span v-else class="material-icons">error</span>
           </div>
           <div class="status-message">{{ statusMessage }}</div>
+          
+          <!-- 진행 상태 표시 -->
+          <div v-if="paymentStatus === 'pending' && progressInfo" class="progress-info">
+            {{ progressInfo }}
+          </div>
           
           <!-- 결제 실패 시 재시도 버튼 표시 -->
           <button v-if="paymentStatus === 'failed'" class="retry-btn" @click="retryPayment">
@@ -192,9 +332,13 @@ onMounted(async () => {
             결제 재시도
           </button>
           
+          <!-- 결제 취소 버튼 -->
+          <button v-if="paymentStatus === 'pending' && !isProcessingCancel" class="cancel-btn" @click="cancelPayment">
+            <span class="material-icons mr-1">close</span>
+            결제 취소
+          </button>
         </div>
       </div>
-      
     </div>
   </div>
 </template>
@@ -385,6 +529,10 @@ onMounted(async () => {
   background-color: #ffe6e6;
 }
 
+.payment-status.cancelled {
+  background-color: #f0f0f0;
+}
+
 .status-icon {
   font-size: 2rem;
   margin-bottom: 10px;
@@ -419,10 +567,20 @@ onMounted(async () => {
   color: #f44336;
 }
 
+.payment-status.cancelled .status-icon {
+  color: #757575;
+}
+
 .status-message {
   font-size: 1.2rem;
   font-weight: 500;
   text-align: center;
+  margin-bottom: 10px;
+}
+
+.progress-info {
+  font-size: 0.9rem;
+  color: #666;
   margin-bottom: 10px;
 }
 
@@ -451,11 +609,12 @@ onMounted(async () => {
   justify-content: center;
   font-size: 1rem;
   transition: background-color 0.2s;
+  margin-top: 10px;
 }
 
 .cancel-btn {
-  background-color: #f1f1f1;
-  color: #555;
+  background-color: #f44336;
+  color: white;
 }
 
 .home-btn {
@@ -466,11 +625,10 @@ onMounted(async () => {
 .retry-btn {
   background-color: #2196f3;
   color: white;
-  margin-top: 10px;
 }
 
 .cancel-btn:hover {
-  background-color: #e5e5e5;
+  background-color: #e53935;
 }
 
 .home-btn:hover, .retry-btn:hover {
@@ -620,7 +778,7 @@ onMounted(async () => {
     font-size: 0.8rem;
   }
   
-  .retry-btn {
+  .retry-btn, .cancel-btn {
     padding: 6px 12px;
     font-size: 0.9rem;
   }

@@ -4,6 +4,7 @@ import (
 	"kiosk/database"
 	"kiosk/routes"
 	"kiosk/utils"
+	"kiosk/handlers"
 	"log"
 	"net/http"
 	"os"
@@ -64,6 +65,12 @@ func main() {
 	// 현재 예수금 출력 (GetCurrentDeposit 사용 예시)
 	currentDeposit := depositState.GetCurrentDeposit()
 	log.Printf("현재 예수금: %s원", utils.FormatNumber(currentDeposit))
+
+    if err := handlers.InitLogSystem(); err != nil {
+        log.Fatalf("로그 시스템 초기화 실패: %v", err)
+    }
+    defer handlers.CloseLogSystem()
+    
 
 	// Gin 라우터 설정
 	r := gin.Default()

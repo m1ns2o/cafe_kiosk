@@ -279,3 +279,15 @@ func (ds *DepositState) UpdateAndCheckDeposit(expectedAmount int64) (bool, int64
 	// 예상 변동액과 실제 변동액 비교
 	return actualChange == expectedAmount, actualChange, nil
 }
+
+func (ds *DepositState) GetKISDepositAmount() (int64, error) {
+	return ds.kisClient.GetDepositAmount()
+}
+
+// SetCurrentDeposit 예수금 수동 설정 (강제 업데이트)
+func (ds *DepositState) SetCurrentDeposit(amount int64) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+	ds.currentDeposit = amount
+	ds.lastUpdateTime = time.Now()
+}
