@@ -1,4 +1,4 @@
-// kis_client.go
+// account.go
 package utils
 
 import (
@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -52,6 +54,13 @@ type BalanceItem struct {
 // BalanceSummary represents account balance summary
 type BalanceSummary struct {
 	DncaTotAmt string `json:"dnca_tot_amt"` // 예수금 총액
+}
+
+type DepositState struct {
+	mu             sync.RWMutex
+	currentDeposit int64
+	lastUpdateTime time.Time
+	kisClient      *KISApi
 }
 
 // NewKISApi creates a new KIS API client
@@ -212,4 +221,61 @@ func FormatNumber(n int64) string {
 		result += string(digit)
 	}
 	return sign + result
+}
+
+// 여기서부터 main.go에서 옮긴 코드 시작
+
+// DepositState 예수금 상태를 관리하는 구조체
+
+
+// NewDepositState 새로운 DepositState 인스턴스 생성
+func NewDepositState(kisClient *KISApi) *DepositState {
+	return &DepositState{
+		kisClient: kisClient,
+	}
+}
+
+// Initialize 초기 예수금 값 설정
+func (ds *DepositState) Initialize() error {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	depositAmount, err := ds.kisClient.GetDepositAmount()
+	if err != nil {
+		return err
+	}
+
+	ds.currentDeposit = depositAmount
+	ds.lastUpdateTime = time.Now()
+	log.Printf("초기 예수금 설정 완료: %s원", FormatNumber(depositAmount))
+	return nil
+}
+
+// GetCurrentDeposit 현재 예수금 조회 (읽기 전용)
+func (ds *DepositState) GetCurrentDeposit() int64 {
+	ds.mu.RLock()
+	defer ds.mu.RUnlock()
+	return ds.currentDeposit
+}
+
+// UpdateAndCheckDeposit 예수금 업데이트 및 변동 확인
+func (ds *DepositState) UpdateAndCheckDeposit(expectedAmount int64) (bool, int64, error) {
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
+
+	// 최신 예수금 조회
+	newDepositAmount, err := ds.kisClient.GetDepositAmount()
+	if err != nil {
+		return false, 0, err
+	}
+
+	// 실제 변동액 계산
+	actualChange := newDepositAmount - ds.currentDeposit
+
+	// 상태 업데이트
+	ds.currentDeposit = newDepositAmount
+	ds.lastUpdateTime = time.Now()
+
+	// 예상 변동액과 실제 변동액 비교
+	return actualChange == expectedAmount, actualChange, nil
 }
