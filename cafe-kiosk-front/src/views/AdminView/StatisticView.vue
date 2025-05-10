@@ -113,10 +113,9 @@
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { getOrders } from '../../api/orderApi';
+import { getOrders, getOrdersByPeriod } from '../../api/orderApi';
 import type { Order } from '../../api/orderApi';
 import Chart from 'chart.js/auto';
-
 // 화면 크기 상태
 const windowWidth = ref(window.innerWidth);
 const windowHeight = ref(window.innerHeight);
@@ -208,53 +207,40 @@ function formatDateTime(dateStr: string): string {
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString('ko-KR', { 
-    year: 'numeric', 
-    month: '2-digit', 
-    day: '2-digit' 
-  }).replace(/\. /g, '-').replace(/\.$/, '');
+  // 'YYYY-MM-DD' 형식으로 변환 (백엔드 API 요구사항)
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
 }
-
+// 주문 내역 가져오기
 // 주문 내역 가져오기
 async function fetchOrderHistory(): Promise<void> {
   isLoading.value = true;
 
   try {
-    // 실제 API 호출 (orderApi에 적절한 함수가 있다고 가정)
-    // const startDate = formatDate(dateRange.value[0]);
-    // const endDate = formatDate(dateRange.value[1]);
-    // const orders = await getOrdersByDateRange(startDate, endDate);
+    // 날짜 포맷 변환
+    const startDate = formatDate(dateRange.value[0]);
+    const endDate = formatDate(dateRange.value[1]);
     
-    // 임시: 모든 주문 가져오기 (실제로는 날짜 범위로 필터링 해야함)
-    const orders = await getOrders();
+    // 백엔드 API를 사용하여 기간별 주문 조회
+    const response = await getOrdersByPeriod(startDate, endDate, {
+      sortBy: 'created_at',
+      order: 'desc'
+    });
     
-    // 날짜 범위로 필터링 (API에서 지원하지 않는 경우 프론트엔드에서 필터링)
-    const startDate = new Date(dateRange.value[0]);
-  const endDate = new Date(dateRange.value[1]);
-
-  // Set start time to beginning of day (00:00:00)
-  startDate.setHours(0, 0, 0, 0);
-  const startTime = startDate.getTime();
-
-  // Set end time to end of day (23:59:59.999)
-  endDate.setHours(23, 59, 59, 999);
-  const endTime = endDate.getTime();
-
-  const filteredOrders = orders.filter(order => {
-    const orderTime = new Date(order.created_at).getTime();
-    return orderTime >= startTime && orderTime <= endTime;
-  });
-
-  orderHistory.value = filteredOrders;
+    // 응답에서 주문 목록 추출
+    orderHistory.value = response.orders;
     
     // 통계 데이터 계산
-    calculateStatistics(filteredOrders);
+    calculateStatistics(response.orders);
     
-    // 차트 업데이트/생성 (nextTick을 사용하여 DOM이 업데이트된 후 실행)
+    // 차트 업데이트/생성
     nextTick(() => {
       setTimeout(() => {
         createOrUpdateCharts();
-      }, 100); // 약간의 지연을 주어 DOM이 완전히 렌더링되도록 함
+      }, 100);
     });
   } catch (error) {
     console.error('주문 내역을 불러오는데 실패했습니다:', error);
@@ -262,7 +248,6 @@ async function fetchOrderHistory(): Promise<void> {
     isLoading.value = false;
   }
 }
-
 // 통계 데이터 계산
 function calculateStatistics(orders: Order[]): void {
   // 1. 메뉴별 판매량 계산 (파이차트용)

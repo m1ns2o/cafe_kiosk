@@ -36,3 +36,37 @@ export async function getOrder(orderId: number): Promise<Order> {
   return res.data;
 }
 
+// 기간별 주문 조회
+export async function getOrdersByPeriod(
+  startDate: string, 
+  endDate: string, 
+  options?: {
+    minAmount?: number;
+    maxAmount?: number;
+    menuId?: number;
+    categoryId?: number;
+    sortBy?: string;
+    order?: 'asc' | 'desc';
+  }
+): Promise<{
+  start_date: string;
+  end_date: string;
+  count: number;
+  orders: Order[];
+}> {
+  let url = `/orders/period?start_date=${startDate}&end_date=${endDate}`;
+  
+  // 추가 옵션 쿼리 파라미터
+  if (options) {
+    if (options.minAmount) url += `&min_amount=${options.minAmount}`;
+    if (options.maxAmount) url += `&max_amount=${options.maxAmount}`;
+    if (options.menuId) url += `&menu_id=${options.menuId}`;
+    if (options.categoryId) url += `&category_id=${options.categoryId}`;
+    if (options.sortBy) url += `&sort_by=${options.sortBy}`;
+    if (options.order) url += `&order=${options.order}`;
+  }
+  
+  const res = await apiClient.get(url);
+  return res.data;
+}
+

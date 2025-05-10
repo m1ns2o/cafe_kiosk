@@ -6,6 +6,7 @@ import (
 	"kiosk/database"
 	"kiosk/models"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -66,6 +67,110 @@ func GetOrder(c *gin.Context) {
         return
     }
     c.JSON(http.StatusOK, order)
+}
+
+// GetOrdersByPeriod는 지정된 기간 내의 주문을 조회합니다
+func GetOrdersByPeriod(c *gin.Context) {
+    // 요청에서 시작일과 종료일 매개변수 가져오기
+    startDate := c.Query("start_date")
+    endDate := c.Query("end_date")
+    
+    // 날짜 매개변수 유효성 검사
+    if startDate == "" || endDate == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "시작일(start_date)과 종료일(end_date) 매개변수가 모두 필요합니다"})
+        return
+    }
+    
+    // 날짜 문자열을 time.Time 객체로 파싱
+    start, err := time.Parse("2006-01-02", startDate)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "잘못된 시작일 형식. YYYY-MM-DD 형식을 사용하세요"})
+        return
+    }
+    
+    end, err := time.Parse("2006-01-02", endDate)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "잘못된 종료일 형식. YYYY-MM-DD 형식을 사용하세요"})
+        return
+    }
+    
+    // 종료일의 전체 날짜를 포함하기 위해 하루 추가
+    end = end.Add(24 * time.Hour)
+    
+    // 추가 필터링 옵션
+    minAmount := c.Query("min_amount")
+    maxAmount := c.Query("max_amount")
+    menuID := c.Query("menu_id")
+    categoryID := c.Query("category_id")
+    sortBy := c.Query("sort_by") // 정렬 필드 (created_at, total_price)
+    order := c.Query("order")    // 정렬 순서 (asc, desc)
+    
+    // 기본 쿼리 설정
+    query := database.DB.Preload("OrderItems.Menu").Where("orders.created_at BETWEEN ? AND ?", start, end)
+    
+    // 금액 범위 필터 적용
+    if minAmount != "" {
+        if minVal, err := strconv.Atoi(minAmount); err == nil {
+            query = query.Where("total_price >= ?", minVal)
+        }
+    }
+    
+    if maxAmount != "" {
+        if maxVal, err := strconv.Atoi(maxAmount); err == nil {
+            query = query.Where("total_price <= ?", maxVal)
+        }
+    }
+    
+    // 특정 메뉴 ID로 필터링
+    if menuID != "" {
+        query = query.Joins("JOIN order_items ON orders.id = order_items.order_id").
+            Where("order_items.menu_id = ?", menuID).
+            Group("orders.id") // 중복 제거
+    }
+    
+    // 특정 카테고리 ID로 필터링
+    if categoryID != "" {
+        query = query.Joins("JOIN order_items ON orders.id = order_items.order_id").
+            Joins("JOIN menus ON order_items.menu_id = menus.id").
+            Where("menus.category_id = ?", categoryID).
+            Group("orders.id") // 중복 제거
+    }
+    
+    // 정렬 적용
+    if sortBy != "" {
+        // 허용된 정렬 필드인지 확인
+        allowedFields := map[string]bool{
+            "created_at":  true,
+            "updated_at":  true,
+            "total_price": true,
+        }
+        
+        if allowedFields[sortBy] {
+            if order != "" && (order == "desc" || order == "asc") {
+                query = query.Order(fmt.Sprintf("%s %s", sortBy, order))
+            } else {
+                // 기본값은 내림차순
+                query = query.Order(fmt.Sprintf("%s desc", sortBy))
+            }
+        }
+    } else {
+        // 기본 정렬: 생성일 내림차순 (최신순)
+        query = query.Order("created_at desc")
+    }
+    
+    // 쿼리 실행
+    var orders []models.Order
+    if err := query.Find(&orders).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+    
+    c.JSON(http.StatusOK, gin.H{
+        "start_date": startDate,
+        "end_date":   endDate,
+        "count":      len(orders),
+        "orders":     orders,
+    })
 }
 
 // OrdersEventStream은 주문 업데이트를 위한 SSE 연결을 처리합니다
