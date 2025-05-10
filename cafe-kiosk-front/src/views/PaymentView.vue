@@ -252,7 +252,7 @@ const generateQRCode = async () => {
 };
 
 // 주문 정보
-const cartItems = computed<CartItem[]>(() => {
+const cartItems = computed(() => {
   if (!route.params.cartItems) return [];
   try {
     const decodedData = decodeURIComponent(route.params.cartItems as string);

@@ -264,7 +264,7 @@ onMounted(async () => {
 				<div v-else class="menu-grid">
 					<div v-for="item in paginatedMenuItems" :key="item.id" class="menu-item" @click="addToCart(item)">
 						<div class="menu-image-container">
-							<img :src="`http://localhost:8080${item.image_url}`" :alt="item.name" />
+							<img :src="item.image_url" :alt="item.name" />
 						</div>
 						<div class="menu-name">{{ item.name }}</div>
 						<div class="menu-price">{{ item.price }}원</div>
