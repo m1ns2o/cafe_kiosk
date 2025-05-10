@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import QRCode from 'qrcode';
+import { PaymentAPI } from '../api/payment';
 
 const route = useRoute();
 const router = useRouter();
@@ -294,59 +295,65 @@ onBeforeUnmount(() => {
 <template>
   <div class="payment-view-container">
     <div class="payment-view">
-      <div class="payment-info">
-        <div class="amount-display">
-          <h2>결제 금액</h2>
-          <div class="total-amount">{{ totalAmount.toLocaleString() }}원</div>
-        </div>
-        
-        <div class="qr-code-container">
-          <div class="qr-code">
-            <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="결제 QR 코드" />
-            <div v-else class="loading-qr">QR 코드 생성 중...</div>
+      <!-- 가로 레이아웃을 위한 구조 변경 -->
+      <div class="payment-layout">
+        <!-- 좌측 영역: QR 코드 -->
+        <div class="payment-left">
+          <div class="qr-code-container">
+            <div class="qr-code">
+              <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="결제 QR 코드" />
+              <div v-else class="loading-qr">QR 코드 생성 중...</div>
+            </div>
+            <p class="qr-instruction">QR 코드를 스캔하여 결제를 진행해주세요.</p>
+            <p class="account-instruction">토스 앱이 없다면 한국투자증권 6961147001로 입금해주세요</p>
           </div>
-          <p class="qr-instruction">QR 코드를 스캔하여 결제를 진행해주세요.</p>
-          
-          <p class="account-instruction">토스 앱이 없다면 한국투자증권 6961147001로 입금해주세요</p>
         </div>
         
-        <!-- 장바구니 아이템 표시 -->
-        <div v-if="cartItems.length > 0" class="cart-summary">
-          <h2>주문 내역</h2>
-          <div class="cart-items-list">
-            <div v-for="(cartItem, index) in cartItems" :key="index" class="cart-item-summary">
-              <div class="item-name">{{ cartItem.item.name }}</div>
-              <div class="item-quantity">{{ cartItem.quantity }}개</div>
-              <div class="item-price">{{ (cartItem.item.price * cartItem.quantity).toLocaleString() }}원</div>
+        <!-- 우측 영역: 결제 정보 및 상태 -->
+        <div class="payment-right">
+          <div class="amount-display">
+            <h2>결제 금액</h2>
+            <div class="total-amount">{{ totalAmount.toLocaleString() }}원</div>
+          </div>
+          
+          <!-- 장바구니 아이템 표시 -->
+          <div v-if="cartItems.length > 0" class="cart-summary">
+            <h2>주문 내역</h2>
+            <div class="cart-items-list">
+              <div v-for="(cartItem, index) in cartItems" :key="index" class="cart-item-summary">
+                <div class="item-name">{{ cartItem.item.name }}</div>
+                <div class="item-quantity">{{ cartItem.quantity }}개</div>
+                <div class="item-price">{{ (cartItem.item.price * cartItem.quantity).toLocaleString() }}원</div>
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div class="payment-status" :class="paymentStatus">
-          <div class="status-icon">
-            <span v-if="paymentStatus === 'pending'" class="material-icons">hourglass_empty</span>
-            <span v-else-if="paymentStatus === 'success'" class="material-icons">check_circle</span>
-            <span v-else-if="paymentStatus === 'cancelled'" class="material-icons">cancel</span>
-            <span v-else class="material-icons">error</span>
+          
+          <div class="payment-status" :class="paymentStatus">
+            <div class="status-icon">
+              <span v-if="paymentStatus === 'pending'" class="material-icons">hourglass_empty</span>
+              <span v-else-if="paymentStatus === 'success'" class="material-icons">check_circle</span>
+              <span v-else-if="paymentStatus === 'cancelled'" class="material-icons">cancel</span>
+              <span v-else class="material-icons">error</span>
+            </div>
+            <div class="status-message">{{ statusMessage }}</div>
+            
+            <!-- 진행 상태 표시 -->
+            <div v-if="paymentStatus === 'pending' && progressInfo" class="progress-info">
+              {{ progressInfo }}
+            </div>
+            
+            <!-- 결제 실패 시 재시도 버튼 표시 -->
+            <button v-if="paymentStatus === 'failed'" class="retry-btn" @click="retryPayment">
+              <span class="material-icons mr-1">refresh</span>
+              결제 재시도
+            </button>
+            
+            <!-- 결제 취소 버튼 -->
+            <button v-if="paymentStatus === 'pending' && !isProcessingCancel" class="cancel-btn" @click="cancelPayment">
+              <span class="material-icons mr-1">close</span>
+              결제 취소
+            </button>
           </div>
-          <div class="status-message">{{ statusMessage }}</div>
-          
-          <!-- 진행 상태 표시 -->
-          <div v-if="paymentStatus === 'pending' && progressInfo" class="progress-info">
-            {{ progressInfo }}
-          </div>
-          
-          <!-- 결제 실패 시 재시도 버튼 표시 -->
-          <button v-if="paymentStatus === 'failed'" class="retry-btn" @click="retryPayment">
-            <span class="material-icons mr-1">refresh</span>
-            결제 재시도
-          </button>
-          
-          <!-- 결제 취소 버튼 -->
-          <button v-if="paymentStatus === 'pending' && !isProcessingCancel" class="cancel-btn" @click="cancelPayment">
-            <span class="material-icons mr-1">close</span>
-            결제 취소
-          </button>
         </div>
       </div>
     </div>
@@ -357,15 +364,16 @@ onBeforeUnmount(() => {
 .payment-view-container {
   display: flex;
   flex-direction: column;
-  /* min-height: 100vh; */
   height: 100%;
   background-color: var(--background-primary, #f5f5f5);
-  padding: 20px;
+  /* padding: 100px; */
+  padding-bottom: 80px;
+  padding-top: 80px;
   overflow: hidden;
 }
 
 .payment-view {
-  max-width: 800px;
+  max-width: 80%; /* 가로 레이아웃을 위해 최대 너비 증가 */
   margin: 0 auto;
   width: 100%;
   height: 100%;
@@ -376,8 +384,33 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  /* padding-bottom: 30%; */
   overflow: hidden;
+}
+
+/* 가로 레이아웃을 위한 새로운 컨테이너 스타일 */
+.payment-layout {
+  display: flex;
+  flex-direction: row; /* 가로 방향으로 배치 */
+  height: 100%;
+  gap: 20px;
+}
+
+/* 좌측 QR 코드 영역 */
+.payment-left {
+  flex: 0 0 40%; /* 고정 너비 (전체의 40%) */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 우측 결제 정보 영역 */
+.payment-right {
+  flex: 1; /* 남은 공간 모두 차지 */
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
 }
 
 .payment-title {
@@ -387,13 +420,6 @@ onBeforeUnmount(() => {
   text-align: center;
   border-bottom: 1px solid #eee;
   padding-bottom: 15px;
-}
-
-.payment-info {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  overflow-y: auto;
 }
 
 .amount-display {
@@ -423,12 +449,7 @@ onBeforeUnmount(() => {
   background-color: white;
   border: 1px solid #eee;
   border-radius: 8px;
-}
-
-.qr-code-container h2 {
-  font-size: 1.2rem;
-  margin-bottom: 15px;
-  color: var(--text-secondary, #555);
+  width: 100%;
 }
 
 .qr-code {
@@ -461,7 +482,6 @@ onBeforeUnmount(() => {
   text-align: center;
   color: #999;
   font-size: 0.9rem;
-  /* max-width: 300px; */
 }
 
 /* 장바구니 요약 스타일 */
@@ -469,7 +489,8 @@ onBeforeUnmount(() => {
   background-color: #f9f9f9;
   border-radius: 8px;
   padding: 15px;
-  max-height: 25vh;
+  /* max-height: 40vh; */
+  flex:1;
   overflow-y: auto;
 }
 
@@ -524,7 +545,6 @@ onBeforeUnmount(() => {
   padding: 15px;
   border-radius: 8px;
   background-color: #f9f9f9;
-  margin-top: 10px;
 }
 
 .payment-status.pending {
@@ -601,13 +621,6 @@ onBeforeUnmount(() => {
   margin-top: 10px;
 }
 
-.payment-actions {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-top: 30px;
-}
-
 .cancel-btn, .home-btn, .retry-btn {
   padding: 10px 20px;
   border-radius: 8px;
@@ -649,8 +662,18 @@ onBeforeUnmount(() => {
   margin-right: 5px;
 }
 
-/* 반응형 스타일링 */
+/* 반응형 스타일링 - 화면 크기에 따라 레이아웃 변경 */
 @media (max-width: 768px) {
+  /* 태블릿 이하 크기에서는 세로 레이아웃으로 변경 */
+  .payment-layout {
+    flex-direction: column;
+  }
+  
+  .payment-left, .payment-right {
+    flex: none;
+    width: 100%;
+  }
+  
   .payment-view {
     padding: 15px;
   }
@@ -679,16 +702,12 @@ onBeforeUnmount(() => {
     height: 200px;
   }
   
-  .payment-actions {
-    flex-direction: column;
-  }
-  
   .cancel-btn, .home-btn, .retry-btn {
     width: 100%;
   }
 }
 
-/* 새로운 height 기반 미디어 쿼리 추가 */
+/* 높이 기반 미디어 쿼리 */
 @media (max-height: 800px) {
   .qr-code {
     width: 220px;
@@ -761,40 +780,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-height: 600px) {
-  .payment-info {
-    gap: 10px;
-  }
-  
-  .qr-code-container {
-    padding: 10px;
-  }
-  
-  .qr-code {
-    width: 150px;
-    height: 150px;
-    margin-bottom: 5px;
-  }
-  
-  .cart-summary {
-    max-height: 12vh;
-  }
-  
-  .cart-item-summary {
-    padding: 5px;
-  }
-  
-  .item-name, .item-quantity, .item-price {
-    font-size: 0.8rem;
-  }
-  
-  .retry-btn, .cancel-btn {
-    padding: 6px 12px;
-    font-size: 0.9rem;
-  }
-}
-
-/* 높이와 너비 모두를 고려한 미디어 쿼리 */
+/* 극단적으로 작은 화면을 위한 미디어 쿼리 */
 @media (max-width: 480px) and (max-height: 700px) {
   .qr-code {
     width: 150px;

@@ -17,6 +17,75 @@ const cartItems = ref<CartItem[]>([]);
 const currentPage = ref(1);
 const itemsPerPage = 8; // 한 페이지에 표시할 아이템 수
 
+// 장바구니 높이 조절 관련 변수 추가
+const cartSectionHeight = ref<number>(25); // 기본값 25vh
+const isDragging = ref<boolean>(false);
+const startY = ref<number>(0);
+const startHeight = ref<number>(0);
+const isResizeHandleVisible = ref<boolean>(true); // 드래그 바 표시 여부
+
+// 장바구니 높이 관련 함수
+const startResize = (e: MouseEvent) => {
+  isDragging.value = true;
+  startY.value = e.clientY;
+  startHeight.value = cartSectionHeight.value;
+  
+  // 마우스 이벤트 리스너 추가
+  document.addEventListener('mousemove', resizeCart);
+  document.addEventListener('mouseup', stopResize);
+};
+
+const resizeCart = (e: MouseEvent) => {
+  if (!isDragging.value) return;
+  
+  // 마우스 이동 거리 계산 (위로 이동하면 값이 커짐)
+  const deltaY = startY.value - e.clientY;
+  
+  // vh 단위로 환산 (윈도우 높이의 1%가 1vh)
+  const deltaVh = (deltaY / window.innerHeight) * 100;
+  
+  // 새 높이 계산
+  let newHeight = startHeight.value + deltaVh;
+  
+  // 최소/최대 높이 제한
+  newHeight = Math.max(15, Math.min(60, newHeight));
+  
+  cartSectionHeight.value = newHeight;
+};
+
+const stopResize = () => {
+  isDragging.value = false;
+  
+  // 마우스 이벤트 리스너 제거
+  document.removeEventListener('mousemove', resizeCart);
+  document.removeEventListener('mouseup', stopResize);
+  
+  // 브라우저에 높이 저장
+  localStorage.setItem('cartSectionHeight', cartSectionHeight.value.toString());
+};
+
+// 드래그 바 토글 함수
+const toggleResizeHandle = () => {
+  isResizeHandleVisible.value = !isResizeHandleVisible.value;
+  // 설정 저장
+  localStorage.setItem('isResizeHandleVisible', isResizeHandleVisible.value.toString());
+};
+
+// 브라우저에서 저장된 설정 로드
+const loadSavedSettings = () => {
+  // 높이 로드
+  const savedHeight = localStorage.getItem('cartSectionHeight');
+  if (savedHeight) {
+    cartSectionHeight.value = parseFloat(savedHeight);
+  }
+  
+  // 드래그 바 표시 설정 로드
+  const savedHandleVisible = localStorage.getItem('isResizeHandleVisible');
+  if (savedHandleVisible !== null) {
+    isResizeHandleVisible.value = savedHandleVisible === 'true';
+  }
+};
+
 // 현재 페이지에 표시할 메뉴 아이템
 const paginatedMenuItems = computed(() => {
   const startIndex = (currentPage.value - 1) * itemsPerPage;
@@ -148,6 +217,10 @@ onMounted(async () => {
       // 초기 메뉴 아이템 로드
       await loadMenuItems(selectedCategory.value);
     }
+    
+    // 저장된 설정 로드
+    loadSavedSettings();
+    
   } catch (err) {
     console.error('카테고리를 불러오는 중 오류가 발생했습니다:', err);
     error.value = '카테고리를 불러오는 중 오류가 발생했습니다.';
@@ -229,8 +302,21 @@ onMounted(async () => {
 				</div>
 			</section>
 
+      <!-- 장바구니 높이 조절 핸들 -->
+      <div v-if="isResizeHandleVisible" class="cart-resize-handle" @mousedown="startResize">
+        <div class="resize-indicator"></div>
+        <button class="toggle-handle-btn" @click.stop="toggleResizeHandle" title="드래그 바 숨기기">
+          <span class="material-icon">visibility_off</span>
+        </button>
+      </div>
+      <div v-else class="show-handle-btn-container">
+        <button class="show-handle-btn" @click="toggleResizeHandle" title="드래그 바 표시하기">
+          <span class="material-icon">tune</span>
+        </button>
+      </div>
+
 			<!-- 장바구니 영역 -->
-			<section class="cart-section">
+			<section class="cart-section" :style="{ maxHeight: `${cartSectionHeight}vh` }">
 				<div class="cart-row">
 					<div class="cart-container">
 						<h2 class="cart-title">장바구니</h2>
@@ -239,7 +325,7 @@ onMounted(async () => {
 							장바구니가 비어있습니다.
 						</div>
 						
-						<div v-else class="cart-items">
+						<div v-else class="cart-items" :style="{ maxHeight: `calc(${cartSectionHeight}vh - 80px)` }">
 							<div v-for="(cartItem, index) in cartItems" :key="index" class="cart-item">
 								<div class="cart-item-info">
 									<div class="cart-item-name">{{ cartItem.item.name }}</div>
@@ -265,7 +351,7 @@ onMounted(async () => {
 					</div>
 					
 					<div class="summary-container">
-						<div class="cart-summary">
+						<div class="cart-summary" :style="{ height: `calc(${cartSectionHeight}vh - 54px)` }">
 							<div class="cart-total">
 								<span>총 금액:</span>
 								<span class="total-amount">{{ totalAmount.toLocaleString() }}원</span>
@@ -293,6 +379,8 @@ onMounted(async () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+/* @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap'); */
+@import url('https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap');
 
 .order-view-container {
   height: 100%; /* Using 100% instead of 100vh */
@@ -316,30 +404,75 @@ onMounted(async () => {
   overflow: hidden; /* 자식 요소 오버플로우 방지 */
 }
 
+/* 크롬 스타일 탭으로 변경 */
 .category-tabs {
   display: flex;
-  background: #f6f6f6;
-  border-bottom: 1px solid #eee;
-  min-height: 46px; /* 최소 높이 설정 */
-  flex-shrink: 0; /* Prevent tabs from shrinking */
+  background: #dee1e6;
+  min-height: 46px;
+  flex-shrink: 0;
+  padding: 20px 6px 0 6px;
+  gap: 5px;
+  position: relative;
+  border-bottom: none;
 }
 
 .category-tabs button {
-  flex: 1;
-  padding: 8px; /* 패딩 줄임 */
-  font-size: 1rem; /* 폰트 크기 줄임 */
-  background: none;
+  position: relative;
+  /* flex: 1 1 auto; */
+  min-width: 200px;
+  /* max-width: 500px; */
+  flex:1;
+  /* gap:10px; */
+  padding: 10px 16px;
+  font-size: 1.5rem;
+  background: #bdc1c9;
+  color: #5f6368;
   border: none;
+  border-radius: 8px 8px 0 0;
   cursor: pointer;
+  margin-right: -4px; /* 탭 간 약간 겹치는 효과 */
+  transition: all 0.2s ease;
+  z-index: 1;
 }
+
+/* .category-tabs button:hover {
+  background: #d0d3d9;
+} */
 
 .category-tabs .active {
-  background: #fff;
-  border-bottom: 2px solid var(--button-primary);
-  color: var(--button-primary);
-  font-weight: bold;
+  background: var(--button-primary);
+  color: #fff;
+  /* text-color: var(--text-primary); */
+  /* font-weight: 500; */
+  z-index: 2; /* 활성 탭을 앞으로 가져오기 */
+  padding-top: 12px; /* 활성 탭을 약간 더 높게 */
+  margin-top: -2px;
+  box-shadow: 0 -2px 6px rgba(0,0,0,0.1);
 }
 
+/* 활성 탭 아래에 흰색 선 추가 */
+/* .category-tabs .active::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #fff;
+  z-index: 3;
+} */
+
+/* 탭 컨테이너 아래 구분선 */
+.category-tabs::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #dadce0;
+  z-index: 1;
+}
 .menu-list {
   padding: 12px; /* 패딩 줄임 */
   width: 100%;
@@ -368,17 +501,15 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* justify-content: flex-start; */
   max-width: 300px;
   margin: 0 auto;
   width: 100%;
-  /* Calculate height based on available space */
-  height: calc((100vh - 46px - 25vh - 60px) / 2); /* 46px for tabs, 25vh for cart, 60px for other padding/margins */
-  max-height: 340px; /* Maximum height limit */
+  /* Calculate height based on available space and dynamic cart height */
+  height: 280px;
+  /* max-height: 340px; Maximum height limit */
   min-height: 180px; /* Minimum height */
-}
-
-.menu-item:hover {
-  box-shadow: 0 4px 12px rgba(255,111,65,0.12);
+  gap:10px;
 }
 
 /* 이미지 컨테이너 추가 */
@@ -400,46 +531,125 @@ onMounted(async () => {
 }
 
 .menu-name {
-  font-size: 0.9rem; /* 폰트 크기 줄임 */
+  font-weight: 600;
+  font-size: 1.1rem; /* 폰트 크기 줄임 */
   margin: 2px 0; /* 마진 줄임 */
   line-height: 1.2;
   /* Ensure text doesn't overflow */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* margin-bottom:10px; */
 }
 
 .menu-price {
   color: var(--button-primary);
   font-weight: bold;
-  font-size: 0.9rem; /* 폰트 크기 줄임 */
-  margin-top: auto; /* Push to bottom of flex container */
+  font-size: 1rem; /* 폰트 크기 줄임 */
+
+  /* margin-top: auto; Push to bottom of flex container */
 }
 
-/* 카트 영역은 원래 CSS 유지 */
+/* 높이 조절 핸들 스타일 */
+.cart-resize-handle {
+  height: 10px;
+  width: 100%;
+  background-color: #f0f0f0;
+  cursor: ns-resize;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-top: 1px solid #ddd;
+  border-bottom: 1px solid #ddd;
+  position: relative;
+  z-index: 11;
+}
+
+.resize-indicator {
+  width: 40px;
+  height: 4px;
+  background-color: #ccc;
+  border-radius: 2px;
+}
+
+.toggle-handle-btn {
+  position: absolute;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background-color: #f0f0f0;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.toggle-handle-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.show-handle-btn-container {
+  position: relative;
+  height: 0;
+  z-index: 11;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.show-handle-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+  background-color: white;
+  color: #888;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+  margin-top: -12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: background-color 0.2s;
+}
+
+.show-handle-btn:hover {
+  background-color: #f8f8f8;
+}
+
+/* 카트 영역 - 동적 높이 적용 */
 .cart-section {
   background: #f8f9fa;
   border-top: 1px solid #eee;
   padding: 12px; /* 패딩 줄임 */
-  max-height: 25vh; /* 최대 높이 제한 */
+  max-height: v-bind('cartSectionHeight + "vh"'); /* 동적 높이 */
   overflow-y: auto; /* 필요시 스크롤 */
+  transition: max-height 0.1s;
 }
 
 .cart-row {
   display: flex;
   flex-direction: row;
   gap: 16px; /* 간격 줄임 */
+  height: 100%;
 }
 
 .cart-container {
   flex: 2;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .summary-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  height: 100%;
 }
 
 .cart-title {
@@ -452,7 +662,7 @@ onMounted(async () => {
   text-align: center;
   color: #888;
   padding: 8px; /* 패딩 줄임 */
-  height: 100px; /* 높이 줄임 */
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -462,10 +672,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px; /* 간격 줄임 */
-  max-height: 100px; /* 최대 높이 제한 */
+  max-height: calc(v-bind('cartSectionHeight + "vh"') - 80px); /* 동적 높이에서 헤더 등 높이 빼기 */
   overflow-y: auto;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
+  flex: 1;
 }
 
 .cart-items::-webkit-scrollbar {
@@ -583,6 +794,9 @@ onMounted(async () => {
   border-radius: 6px; /* 라운딩 줄임 */
   padding: 12px; /* 패딩 줄임 */
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  height: calc(v-bind('cartSectionHeight + "vh"') - 54px); /* 동적 높이 */
+  display: flex;
+  flex-direction: column;
 }
 
 .cart-total {
@@ -604,6 +818,8 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 6px; /* 간격 줄임 */
+  margin-top: auto; /* 버튼이 항상 아래에 위치 */
+  flex: 1; /* 남은 공간 차지 */
 }
 
 .clear-cart-btn, .order-btn {
@@ -616,6 +832,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   font-size: 0.9rem; /* 폰트 크기 줄임 */
+  flex: 1; /* 버튼이 각각 동일한 높이 비율로 공간 차지 */
 }
 
 .mr-1 {
@@ -696,12 +913,17 @@ onMounted(async () => {
   }
   
   .cart-section {
-    max-height: 40vh;
+    max-height: v-bind('cartSectionHeight + "vh"');
   }
   
   .menu-item {
-    /* Recalculate for 2 columns layout */
-    height: calc((100vh - 46px - 40vh - 60px) / 3);
+    height: 180px; /* 태블릿에서의 고정 높이 */
+  }
+  
+  .cart-summary {
+    height: auto;
+    min-height: 100px;
+    margin-top: 10px;
   }
 }
 
@@ -711,8 +933,7 @@ onMounted(async () => {
   }
   
   .menu-item {
-    /* Recalculate for 1 column layout */
-    height: calc((100vh - 46px - 40vh - 60px) / 3);
+    height: 180px; /* 모바일에서의 고정 높이 */
     max-height: 280px;
   }
 }
@@ -720,13 +941,13 @@ onMounted(async () => {
 /* Add height-based media queries */
 @media (max-height: 800px) {
   .menu-item {
-    height: calc((100vh - 46px - 25vh - 50px) / 2);
+    height: 200px; /* 화면 높이에 따른 고정 높이 */
   }
 }
 
 @media (max-height: 600px) {
   .menu-item {
-    height: calc((100vh - 46px - 25vh - 40px) / 2);
+    height: 150px; /* 작은 화면에서의 고정 높이 */
     min-height: 150px;
   }
   
