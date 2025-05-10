@@ -1,19 +1,20 @@
 package handlers
 
 import (
-    "encoding/json"
-    "fmt"
-    "kiosk/models"
-    "kiosk/utils"
-    "log"
-    "net/http"
-    "os"
-    "path/filepath"
-    "sync"
-    "time"
-    
-    "github.com/gin-gonic/gin"
-    "github.com/gorilla/websocket"
+	"encoding/json"
+	"fmt"
+	"kiosk/models"
+	"kiosk/utils"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -21,9 +22,13 @@ var (
     paymentLogFile *os.File
     // 로거 인스턴스
     paymentLogger *log.Logger
+    
+    // 진행 중인 결제 작업 관리
+    activePayments     = make(map[string]chan bool)
+    activePaymentsMutex sync.Mutex
 )
 
-// 로그 시스템 초기화
+// 로그 시스템 초기화 (기존 코드와 동일)
 func InitLogSystem() error {
     // 로그 디렉토리 생성
     logDir := "logs"
@@ -45,21 +50,18 @@ func InitLogSystem() error {
     paymentLogFile = file
     paymentLogger = log.New(file, "", log.LstdFlags)
     
-    // 콘솔과 파일 모두에 로깅하기 위해 멀티 라이터 설정
-    // log.SetOutput(io.MultiWriter(os.Stdout, file))
-    
     paymentLogger.Println("결제 로그 시스템 초기화 완료")
     return nil
 }
 
-// 로그 시스템 종료
+// 로그 시스템 종료 (기존 코드와 동일)
 func CloseLogSystem() {
     if paymentLogFile != nil {
         paymentLogFile.Close()
     }
 }
 
-// 로그 메시지 기록 (콘솔 및 파일)
+// 로그 메시지 기록 (기존 코드와 동일)
 func logMessage(format string, args ...interface{}) {
     message := fmt.Sprintf(format, args...)
     log.Println(message)  // 콘솔에 출력
@@ -69,7 +71,7 @@ func logMessage(format string, args ...interface{}) {
     }
 }
 
-// 웹소켓 연결 업그레이더 정의
+// 웹소켓 연결 업그레이더 정의 (기존 코드와 동일)
 var upgrader = websocket.Upgrader{
     ReadBufferSize:  1024,
     WriteBufferSize: 1024,
@@ -78,7 +80,7 @@ var upgrader = websocket.Upgrader{
     },
 }
 
-// 웹소켓 메시지 타입 정의
+// 웹소켓 메시지 타입 정의 (기존 코드와 동일)
 const (
     MsgTypePaymentRequest = "payment_request"
     MsgTypePaymentStatus  = "payment_status"
@@ -88,17 +90,23 @@ const (
     MsgTypeCancelResult   = "cancel_result"
 )
 
-// 웹소켓 메시지 구조체
+// 웹소켓 메시지 구조체 (기존 코드와 동일)
 type WebSocketMessage struct {
     Type    string      `json:"type"`
     Payload interface{} `json:"payload"`
 }
 
-// PaymentStatus 구조체 - 결제 과정 중 상태 업데이트
+// CancelRequest 구조체 - 취소 요청 데이터
+type CancelRequest struct {
+    PaymentID string `json:"payment_id"`
+}
+
+// PaymentStatus 구조체 (payment_id 필드 추가)
 type PaymentStatus struct {
-    Attempt      int   `json:"attempt"`
-    MaxAttempts  int   `json:"max_attempts"`
-    ActualChange int64 `json:"actual_change,omitempty"`
+    PaymentID    string `json:"payment_id"`
+    Attempt      int    `json:"attempt"`
+    MaxAttempts  int    `json:"max_attempts"`
+    ActualChange int64  `json:"actual_change,omitempty"`
 }
 
 // PaymentHandler 웹소켓 핸들러
@@ -157,16 +165,65 @@ func PaymentHandler(c *gin.Context) {
                 continue
             }
 
+            // 결제 ID 생성
+            paymentID := uuid.New().String()
+            
+            // 취소 채널 생성 및 등록
+            cancelChan := make(chan bool, 1)
+            
+            activePaymentsMutex.Lock()
+            activePayments[paymentID] = cancelChan
+            activePaymentsMutex.Unlock()
+            
+            // 결제 ID를 클라이언트에 알림
+            sendMessage(conn, nil, "payment_initiated", gin.H{
+                "payment_id": paymentID,
+                "amount": req.Amount,
+                "timestamp": time.Now().Format(time.RFC3339),
+            })
+            
             // 비동기로 결제 처리 시작
-            go processPaymentWithWebSocket(conn, depositState, req)
+            go processPaymentWithWebSocket(conn, depositState, req, paymentID, cancelChan)
 
         case MsgTypeCancelRequest:
-            // 결제 취소 요청 처리
-            sendMessage(conn, nil, MsgTypeCancelResult, gin.H{
-                "success": true,
-                "message": "결제가 취소되었습니다",
-            })
-            logMessage("결제 취소 요청 처리 완료")
+            // 취소 요청 페이로드 파싱
+            payloadBytes, err := json.Marshal(wsMsg.Payload)
+            if err != nil {
+                sendError(conn, "invalid cancel request format")
+                continue
+            }
+
+            var cancelReq CancelRequest
+            if err := json.Unmarshal(payloadBytes, &cancelReq); err != nil {
+                sendError(conn, "invalid cancel request data")
+                continue
+            }
+            
+            // 결제 ID가 없는 경우
+            if cancelReq.PaymentID == "" {
+                sendError(conn, "payment ID is required for cancellation")
+                continue
+            }
+            
+            // 결제 취소 처리
+            cancelled := cancelPayment(cancelReq.PaymentID)
+            
+            // 결과 전송
+            if cancelled {
+                sendMessage(conn, nil, MsgTypeCancelResult, gin.H{
+                    "success": true,
+                    "payment_id": cancelReq.PaymentID,
+                    "message": "결제가 성공적으로 취소되었습니다",
+                })
+                logMessage("결제 취소 처리 완료 - 결제 ID: %s", cancelReq.PaymentID)
+            } else {
+                sendMessage(conn, nil, MsgTypeCancelResult, gin.H{
+                    "success": false,
+                    "payment_id": cancelReq.PaymentID,
+                    "message": "취소할 결제를 찾을 수 없거나 이미 완료된 결제입니다",
+                })
+                logMessage("결제 취소 실패 - 결제 ID: %s (존재하지 않거나 이미 완료됨)", cancelReq.PaymentID)
+            }
             
         default:
             sendError(conn, "unknown message type")
@@ -174,18 +231,50 @@ func PaymentHandler(c *gin.Context) {
     }
 }
 
-// 웹소켓을 통한 결제 처리
-func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.DepositState, req models.PaymentRequest) {
+// 결제 취소 함수
+func cancelPayment(paymentID string) bool {
+    activePaymentsMutex.Lock()
+    defer activePaymentsMutex.Unlock()
+    
+    // 취소할 결제 찾기
+    cancelChan, exists := activePayments[paymentID]
+    if !exists {
+        return false // 결제 ID가 없음
+    }
+    
+    // 취소 신호 전송
+    select {
+    case cancelChan <- true:
+        // 신호가 성공적으로 전송됨
+    default:
+        // 채널이 이미 닫혔거나 수신할 수 없는 상태
+    }
+    
+    // 맵에서 제거
+    delete(activePayments, paymentID)
+    return true
+}
+
+// 웹소켓을 통한 결제 처리 (취소 기능 추가)
+func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.DepositState, 
+                                req models.PaymentRequest, paymentID string, cancelChan chan bool) {
+    // 함수 종료시 결제 작업 정리
+    defer func() {
+        activePaymentsMutex.Lock()
+        delete(activePayments, paymentID)
+        activePaymentsMutex.Unlock()
+        close(cancelChan)
+    }()
+    
     // 웹소켓 메시지 전송을 위한 뮤텍스 (동시 전송 방지)
     var mutex sync.Mutex
 
     // 초기 예수금 조회 및 로깅
     initialDeposit := depositState.GetCurrentDeposit()
-    log.Printf("결제 요청 시작 - 요청 금액: %s원, 초기 예수금: %s원\n", 
-        utils.FormatNumber(req.Amount), utils.FormatNumber(initialDeposit))
+    log.Printf("결제 요청 시작 - ID: %s, 요청 금액: %s원, 초기 예수금: %s원\n", 
+        paymentID, utils.FormatNumber(req.Amount), utils.FormatNumber(initialDeposit))
 
     // 결제 시작 전 한 번 더 예수금 상태 조회 및 업데이트
-    // 기존 예수금 잔고와 값이 동일한지 확인
     latestDepositAmount, err := depositState.GetKISDepositAmount()
     if err != nil {
         logMessage("초기 예수금 재확인 실패: %v", err)
@@ -210,7 +299,7 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
     }
 
     // 결제 처리 파라미터 설정
-    maxAttempts := 20
+    maxAttempts := 180
     interval := 1 * time.Second
     success := false
     var actualChange int64
@@ -222,6 +311,32 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
     startTime := time.Now()
 
     for attempt := 1; attempt <= maxAttempts; attempt++ {
+        // 취소 요청 확인
+        select {
+        case <-cancelChan:
+            // 취소 요청 수신
+            logMessage("결제 취소 요청 수신 - ID: %s, 시도 #%d에서 중단됨", paymentID, attempt)
+            
+            // 결제 취소 결과 전송
+            response := models.PaymentResponse{
+                Success: false,
+                Message: "사용자 요청에 의해 결제가 취소되었습니다",
+                Details: map[string]interface{}{
+                    "payment_id":      paymentID,
+                    "expected_amount": req.Amount,
+                    "actual_change":   actualChange,
+                    "cancelled_at":    time.Now().Format(time.RFC3339),
+                    "elapsed_time":    time.Since(startTime).String(),
+                    "attempt":         attempt,
+                },
+            }
+            sendMessage(conn, &mutex, MsgTypePaymentResult, response)
+            return
+            
+        default:
+            // 취소 요청이 없으면 결제 처리 계속 진행
+        }
+        
         // 최신 예수금 조회를 통한 예수금 업데이트
         success, actualChange, err = depositState.UpdateAndCheckDeposit(req.Amount)
         
@@ -236,6 +351,7 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
 
         // 상태 업데이트 전송
         status := PaymentStatus{
+            PaymentID:    paymentID,
             Attempt:      attempt,
             MaxAttempts:  maxAttempts,
             ActualChange: actualChange,
@@ -243,25 +359,26 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
         sendMessage(conn, &mutex, MsgTypePaymentStatus, status)
 
         // 상태 로깅
-        log.Printf("결제 확인 시도 #%d - 예상 증가액: %s원, 실제 증가액: %s원, 현재 예수금: %s원\n", 
-            attempt, utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), 
+        log.Printf("결제 확인 시도 #%d - ID: %s, 예상 증가액: %s원, 실제 증가액: %s원, 현재 예수금: %s원\n", 
+            attempt, paymentID, utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), 
             utils.FormatNumber(currentDeposit))
 
         // 결제 금액 검증 - 예상 금액과 실제 변동액 비교
         if success {
-            log.Printf("결제 성공 - 요청 금액: %s원, 실제 변동액: %s원, 소요 시간: %v\n", 
-                utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), time.Since(startTime))
+            log.Printf("결제 성공 - ID: %s, 요청 금액: %s원, 실제 변동액: %s원, 소요 시간: %v\n", 
+                paymentID, utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), time.Since(startTime))
             break
         } else if(actualChange !=0){
-            logMessage("결제 실패 - 요청 금액: %s원, 최종 변동액: %s원, 타임아웃: %v초", 
-                utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), time.Since(startTime))
+            logMessage("결제 실패 - ID: %s, 요청 금액: %s원, 최종 변동액: %s원, 타임아웃: %v초", 
+                paymentID, utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), time.Since(startTime))
                 
         }
 
         // 이전 예수금과 현재 예수금(변동액 제외) 비교
         currentDepositWithoutChange := currentDeposit - actualChange
         if previousDeposit != currentDepositWithoutChange {
-            logMessage("[주의] 예수금 불일치 감지 - 이전: %s원, 현재(변동 전): %s원, 차이: %s원", 
+            logMessage("[주의] 예수금 불일치 감지 - ID: %s, 이전: %s원, 현재(변동 전): %s원, 차이: %s원", 
+                paymentID,
                 utils.FormatNumber(previousDeposit), 
                 utils.FormatNumber(currentDepositWithoutChange), 
                 utils.FormatNumber(currentDepositWithoutChange - previousDeposit))
@@ -271,7 +388,31 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
         previousDeposit = currentDeposit
 
         if attempt < maxAttempts {
-            time.Sleep(interval)
+            // 취소 요청을 감지하기 위해 select로 대기
+            select {
+            case <-cancelChan:
+                // 취소 요청 수신
+                logMessage("결제 취소 요청 수신 - ID: %s, 시도 #%d에서 중단됨", paymentID, attempt)
+                
+                // 결제 취소 결과 전송
+                response := models.PaymentResponse{
+                    Success: false,
+                    Message: "사용자 요청에 의해 결제가 취소되었습니다",
+                    Details: map[string]interface{}{
+                        "payment_id":      paymentID,
+                        "expected_amount": req.Amount,
+                        "actual_change":   actualChange,
+                        "cancelled_at":    time.Now().Format(time.RFC3339),
+                        "elapsed_time":    time.Since(startTime).String(),
+                        "attempt":         attempt,
+                    },
+                }
+                sendMessage(conn, &mutex, MsgTypePaymentResult, response)
+                return
+                
+            case <-time.After(interval):
+                // 타임아웃 - 다음 시도로 계속 진행
+            }
         }
     }
 
@@ -281,6 +422,7 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
             Success: true,
             Message: "결제가 성공적으로 확인되었습니다",
             Details: map[string]interface{}{
+                "payment_id":      paymentID,
                 "expected_amount": req.Amount,
                 "actual_change":   actualChange,
                 "verified_at":     time.Now().Format(time.RFC3339),
@@ -290,14 +432,15 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
         sendMessage(conn, &mutex, MsgTypePaymentResult, response)
     } else {
         // 결제 실패 로깅
-        logMessage("[중요] 결제 실패 - 요청 금액: %s원, 최종 변동액: %s원, 타임아웃: %v초", 
-            utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), 
+        logMessage("[중요] 결제 실패 - ID: %s, 요청 금액: %s원, 최종 변동액: %s원, 타임아웃: %v초", 
+            paymentID, utils.FormatNumber(req.Amount), utils.FormatNumber(actualChange), 
             maxAttempts*int(interval/time.Second))
 
         response := models.PaymentResponse{
             Success: false,
             Message: "결제 확인 시간 초과",
             Details: map[string]interface{}{
+                "payment_id":      paymentID,
                 "expected_amount": req.Amount,
                 "actual_change":   actualChange,
                 "timeout_after":   fmt.Sprintf("%d초", maxAttempts*int(interval/time.Second)),
@@ -308,14 +451,14 @@ func processPaymentWithWebSocket(conn *websocket.Conn, depositState *utils.Depos
     }
 }
 
-// 웹소켓 에러 메시지 전송
+// 웹소켓 에러 메시지 전송 (기존 코드와 동일)
 func sendError(conn *websocket.Conn, errorMsg string) {
     var mutex sync.Mutex
     logMessage("에러: %s", errorMsg)
     sendMessage(conn, &mutex, MsgTypeError, gin.H{"error": errorMsg})
 }
 
-// 웹소켓 메시지 전송 (스레드 안전)
+// 웹소켓 메시지 전송 (스레드 안전) (기존 코드와 동일)
 func sendMessage(conn *websocket.Conn, mutex *sync.Mutex, msgType string, payload interface{}) {
     msg := WebSocketMessage{
         Type:    msgType,
@@ -328,6 +471,6 @@ func sendMessage(conn *websocket.Conn, mutex *sync.Mutex, msgType string, payloa
     }
     
     if err := conn.WriteJSON(msg); err != nil {
-        logMessage("웹소켓 메시지 전송 실패: %v", err)
+        log.Printf("웹소켓 메시지 전송 실패: %v", err)
     }
 }

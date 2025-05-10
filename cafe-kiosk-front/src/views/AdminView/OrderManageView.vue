@@ -140,8 +140,8 @@ function setupSSEConnection(): void {
   eventSource = new EventSource('http://localhost:8080/api/orders/stream');
   
   // 연결 수립 이벤트
-  eventSource.onopen = (event) => {
-    console.log('SSE 연결이 수립되었습니다.');
+  eventSource.onopen = () => {
+    console.log('SSE 연결');
   };
   
   // 메시지 수신 이벤트

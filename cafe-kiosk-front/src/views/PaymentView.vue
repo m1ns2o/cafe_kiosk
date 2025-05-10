@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { PaymentAPI } from '../api/payment';
-import type { CartItem } from '../types/menuType';
 import QRCode from 'qrcode';
 
 const route = useRoute();
@@ -14,6 +12,7 @@ const statusMessage = ref<string>('결제를 진행 중입니다...');
 const progressInfo = ref<string>('');
 const paymentAttempt = ref<number>(0);
 const maxAttempts = ref<number>(0);
+const paymentID = ref<string>('');
 
 // QR 코드 관련
 const qrCodeDataUrl = ref<string>('');
@@ -58,54 +57,7 @@ const setupWebSocket = () => {
 };
 
 // 웹소켓 메시지 처리
-const handleWebSocketMessage = (event: MessageEvent) => {
-  try {
-    const message = JSON.parse(event.data);
-    
-    switch (message.type) {
-      case 'payment_status':
-        // 결제 진행 상태 업데이트
-        paymentAttempt.value = message.payload.attempt;
-        maxAttempts.value = message.payload.max_attempts;
-        progressInfo.value = `결제 확인 중... (${paymentAttempt.value}/${maxAttempts.value})`;
-        break;
-        
-      case 'payment_result':
-        // 최종 결제 결과 처리
-        handlePaymentResult(message.payload);
-        break;
-        
-      case 'error':
-        // 오류 처리
-        paymentStatus.value = 'failed';
-        statusMessage.value = message.payload.error || '결제 처리 중 오류가 발생했습니다.';
-        
-        redirectTimer = setTimeout(() => {
-          router.push({ name: 'OrderView' });
-        }, 5000);
-        break;
-        
-      case 'cancel_result':
-        // 취소 결과 처리
-        if (message.payload.success) {
-          paymentStatus.value = 'cancelled';
-          statusMessage.value = '결제가 취소되었습니다.';
-          isProcessingCancel.value = false;
-          
-          // 3초 후 주문 화면으로 이동
-          redirectTimer = setTimeout(() => {
-            router.push({ name: 'OrderView' });
-          }, 3000);
-        } else {
-          isProcessingCancel.value = false;
-          statusMessage.value = message.payload.message || '결제 취소에 실패했습니다.';
-        }
-        break;
-    }
-  } catch (error) {
-    console.error('웹소켓 메시지 파싱 오류:', error);
-  }
-};
+
 
 // 결제 결과 처리
 const handlePaymentResult = (result: any) => {
@@ -151,6 +103,63 @@ const sendPaymentRequest = () => {
 };
 
 // 결제 취소 요청 전송 (웹소켓)
+// 웹소켓 메시지 처리 함수 전체
+const handleWebSocketMessage = (event: MessageEvent) => {
+  try {
+    const message = JSON.parse(event.data);
+    
+    switch (message.type) {
+      case 'payment_initiated':
+        // 결제 ID 저장
+        paymentID.value = message.payload.payment_id;
+        console.log('결제 ID 수신:', paymentID.value);
+        break;
+        
+      case 'payment_status':
+        // 결제 진행 상태 업데이트
+        paymentAttempt.value = message.payload.attempt;
+        maxAttempts.value = message.payload.max_attempts;
+        progressInfo.value = `결제 확인 중... (${paymentAttempt.value}/${maxAttempts.value})`;
+        break;
+        
+      case 'payment_result':
+        // 최종 결제 결과 처리
+        handlePaymentResult(message.payload);
+        break;
+        
+      case 'error':
+        // 오류 처리
+        paymentStatus.value = 'failed';
+        statusMessage.value = message.payload.error || '결제 처리 중 오류가 발생했습니다.';
+        
+        redirectTimer = setTimeout(() => {
+          router.push({ name: 'OrderView' });
+        }, 5000);
+        break;
+        
+      case 'cancel_result':
+        // 취소 결과 처리
+        if (message.payload.success) {
+          paymentStatus.value = 'cancelled';
+          statusMessage.value = '결제가 취소되었습니다.';
+          isProcessingCancel.value = false;
+          
+          // 3초 후 주문 화면으로 이동
+          redirectTimer = setTimeout(() => {
+            router.push({ name: 'OrderView' });
+          }, 3000);
+        } else {
+          isProcessingCancel.value = false;
+          statusMessage.value = message.payload.message || '결제 취소에 실패했습니다.';
+        }
+        break;
+    }
+  } catch (error) {
+    console.error('웹소켓 메시지 파싱 오류:', error);
+  }
+};
+
+// 결제 취소 요청 함수 전체
 const cancelPayment = () => {
   if (!socket.value || socket.value.readyState !== WebSocket.OPEN) {
     console.error('웹소켓이 연결되지 않았습니다.');
@@ -163,13 +172,14 @@ const cancelPayment = () => {
   const cancelRequest = {
     type: 'cancel_request',
     payload: {
+      payment_id: paymentID.value,
       amount: totalAmount.value,
       timestamp: new Date().toISOString()
     }
   };
   
   socket.value.send(JSON.stringify(cancelRequest));
-  console.log('결제 취소 요청 전송 완료');
+  console.log('결제 취소 요청 전송 완료 - 결제 ID:', paymentID.value);
 };
 
 // 결제 재시도

@@ -15,7 +15,7 @@ const cartItems = ref<CartItem[]>([]);
 
 // 페이지네이션 관련 변수
 const currentPage = ref(1);
-const itemsPerPage = 6; // 한 페이지에 표시할 아이템 수
+const itemsPerPage = 8; // 한 페이지에 표시할 아이템 수
 
 // 현재 페이지에 표시할 메뉴 아이템
 const paginatedMenuItems = computed(() => {
@@ -351,7 +351,7 @@ onMounted(async () => {
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px; /* 간격 줄임 */
   width: 100%;
   margin-bottom: 10px; /* 마진 줄임 */
