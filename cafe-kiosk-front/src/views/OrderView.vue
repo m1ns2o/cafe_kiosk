@@ -410,7 +410,7 @@ onMounted(async () => {
   background: #dee1e6;
   min-height: 46px;
   flex-shrink: 0;
-  padding: 20px 6px 0 6px;
+  padding: 5px 6px 0 6px;
   gap: 5px;
   position: relative;
   border-bottom: none;

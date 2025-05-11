@@ -58,55 +58,93 @@
       </el-col>
 
       <!-- 주문 내역 (우측) -->
-      <el-col :xs="24" :sm="24" :md="10" :lg="10" class="order-history-col">
-        <el-card shadow="hover" class="order-history-card">
-          <template #header>
-            <div class="card-header">
-              주문 내역
-              <el-date-picker
-                v-model="dateRange"
-                type="daterange"
-                range-separator="~"
-                start-placeholder="시작일"
-                end-placeholder="종료일"
-                format="YYYY-MM-DD"
+      <!-- 주문 내역 (우측) -->
+<el-col :xs="24" :sm="24" :md="10" :lg="10" class="order-history-col">
+  <el-card shadow="hover" class="order-history-card">
+    <template #header>
+      <div class="card-header">
+        주문 내역
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="시작일"
+          end-placeholder="종료일"
+          format="YYYY-MM-DD"
+          size="small"
+          style="width: 200px; margin-left: 10px;"
+          @change="fetchOrderHistory"
+        />
+      </div>
+    </template>
+    
+    <div class="order-table-wrapper">
+      <div v-if="isLoading" class="table-loading">
+        <el-skeleton animated :rows="10" />
+      </div>
+      <div v-else-if="orderHistory.length === 0" class="table-empty">
+        <el-empty description="주문 내역이 없습니다." />
+      </div>
+      <el-table
+        v-else
+        :data="orderHistory"
+        style="width: 100%"
+        class="order-table"
+        :header-cell-style="{ fontSize: '15px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
+        :cell-style="{ fontSize: '14px', height: '50px' }"
+      >
+        <el-table-column type="expand">
+          <template #default="props">
+            <div class="order-detail-wrapper">
+              <h4 class="order-detail-title">주문 상세 정보</h4>
+              <el-table
+                :data="props.row.order_items"
+                style="width: 100%"
+                class="order-detail-table"
+                :show-header="true"
                 size="small"
-                style="width: 200px; margin-left: 10px;"
-                @change="fetchOrderHistory"
-              />
+                border
+              >
+                <el-table-column label="상품명" min-width="120">
+                  <template #default="scope">
+                    {{ scope.row.menu.name || '알 수 없는 메뉴' }}
+                  </template>
+                </el-table-column>
+                <el-table-column prop="quantity" label="수량" width="70" align="center" />
+                <el-table-column label="단가" width="100" align="right">
+                  <template #default="scope">
+                    {{ scope.row.price.toLocaleString() }}원
+                  </template>
+                </el-table-column>
+                <el-table-column label="소계" width="100" align="right">
+                  <template #default="scope">
+                    {{ (scope.row.price * scope.row.quantity).toLocaleString() }}원
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div class="order-total">
+                <strong>합계: {{ props.row.total_price.toLocaleString() }}원</strong>
+              </div>
             </div>
           </template>
-          
-          <div class="order-table-wrapper">
-            <div v-if="isLoading" class="table-loading">
-              <el-skeleton animated :rows="10" />
-            </div>
-            <div v-else-if="orderHistory.length === 0" class="table-empty">
-              <el-empty description="주문 내역이 없습니다." />
-            </div>
-            <el-table
-              v-else
-              :data="orderHistory"
-              style="width: 100%"
-              class="order-table"
-              :header-cell-style="{ fontSize: '15px', fontWeight: 'bold', background: '#f5f7fa', height: '50px' }"
-              :cell-style="{ fontSize: '14px', height: '50px' }"
-            >
-              <el-table-column prop="id" label="주문번호" width="80" align="center"/>
-              <el-table-column prop="created_at" label="주문시간" min-width="80">
-                <template #default="scope">
-                  {{ formatDateTime(scope.row.created_at) }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="total_price" label="주문금액" width="120" align="right">
-                <template #default="scope">
-                  {{ scope.row.total_price.toLocaleString() }}원
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </el-card>
-      </el-col>
+        </el-table-column>
+        <el-table-column prop="id" label="주문번호" width="80" align="center"/>
+        <el-table-column prop="created_at" label="주문시간" min-width="80">
+          <template #default="scope">
+            {{ formatDateTime(scope.row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="total_price" label="주문금액" width="120" align="right">
+          <template #default="scope">
+            {{ scope.row.total_price.toLocaleString() }}원
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+  </el-card>
+</el-col>
+
+
     </el-row>
   </div>
 </template>
@@ -651,6 +689,67 @@ watch(getChartHeight, () => {
   flex: 1;
   height: 100%;
   overflow: auto;
+}
+.order-detail-wrapper {
+  padding: 10px 20px 15px;
+  background-color: #f8fafc;
+  border-radius: 4px;
+}
+
+.order-detail-title {
+  font-size: 14px;
+  color: #606266;
+  margin: 5px 0 10px;
+}
+
+.order-detail-table {
+  margin-bottom: 10px;
+}
+
+.order-total {
+  text-align: right;
+  color: #409eff;
+  font-size: 15px;
+  padding: 5px 5px 0;
+  border-top: 1px dashed #e0e0e0;
+}
+
+/* 확장 행의 화살표 스타일 */
+:deep(.el-table__expand-icon) {
+  font-size: 16px;
+  color: #409eff;
+  transition: transform 0.2s ease;
+}
+
+:deep(.el-table__expand-icon--expanded) {
+  transform: rotate(90deg);
+}
+
+/* 확장 영역의 배경색 설정 */
+:deep(.el-table__expanded-cell) {
+  background-color: #f8fafc;
+}
+
+/* 확장행 호버 효과 강화 */
+:deep(.el-table__row:hover) {
+  cursor: pointer;
+  background-color: #f0f9ff !important;
+}
+
+/* 모바일 대응 */
+@media (max-width: 768px) {
+  .order-detail-wrapper {
+    padding: 10px;
+  }
+  
+  .order-detail-title {
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  
+  .order-total {
+    font-size: 14px;
+  }
 }
 
 
