@@ -51,6 +51,7 @@ export const MenuAPI = {
 
   // 메뉴 수정 (이미지 포함)
   updateMenu: (id: number, data: FormData) => {
+    console.log('updateMenu API 호출:', id, data);
     return apiClient.put<MenuItem>(`/menus/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 

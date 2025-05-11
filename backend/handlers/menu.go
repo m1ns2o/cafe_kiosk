@@ -152,7 +152,7 @@ func UpdateMenu(c *gin.Context) {
         // 새 파일명 생성
         ext := filepath.Ext(file.Filename)
         fileName := strconv.FormatInt(time.Now().UnixNano(), 10) + ext
-        filePath := filepath.Join("static", "uploads", fileName)
+        filePath := filepath.Join("uploads", fileName)
         
         // 파일 저장
         if err := c.SaveUploadedFile(file, filePath); err != nil {
