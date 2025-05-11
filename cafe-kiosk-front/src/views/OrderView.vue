@@ -485,9 +485,9 @@ onMounted(async () => {
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px; /* 간격 줄임 */
+  gap: 12px; 
   width: 100%;
-  margin-bottom: 10px; /* 마진 줄임 */
+  margin-bottom: 10px; 
 }
 
 .menu-item {
