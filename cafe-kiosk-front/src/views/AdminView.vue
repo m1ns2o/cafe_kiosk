@@ -8,6 +8,7 @@ import {
 	PieChart,
 	List,
 	Wallet,
+	Notification,
 } from "@element-plus/icons-vue";
 
 const isCollapse = ref(true);
@@ -87,6 +88,10 @@ onMounted(() => {
 				<el-menu-item index="/admin/order">
 					<el-icon><Wallet /></el-icon>
 					<template #title>Order</template>
+				</el-menu-item>
+				<el-menu-item index="/admin/memo">
+					<el-icon><Notification /></el-icon>
+					<template #title>Memo</template>
 				</el-menu-item>
 			</el-menu>
 		</div>

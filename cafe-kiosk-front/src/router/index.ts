@@ -7,6 +7,7 @@ import CategoryView from '../views/AdminView/CategoryView.vue'
 import MenuView from '../views/AdminView/MenuView.vue'
 import OrderManageView from '../views/AdminView/OrderManageView.vue'
 import StatisticView from '../views/AdminView/StatisticView.vue'
+import MemoView from '../views/AdminView/MemoView.vue'
 
 const routes = [
   {
@@ -38,6 +39,11 @@ const routes = [
         path: 'statistics', // /admin/statistics
         name: 'AdminStatistics',
         component: StatisticView
+      },
+      {
+        path: 'memo', // /admin/memo
+        name: 'Memo',
+        component: MemoView
       },
       {
         path: 'category', // /admin/category
