@@ -137,7 +137,7 @@ function setupSSEConnection(): void {
   }
   
   // SSE 연결 생성
-  eventSource = new EventSource('http://localhost:8080/api/orders/stream');
+  eventSource = new EventSource('/api/orders/stream');
   
   // 연결 수립 이벤트
   eventSource.onopen = () => {
