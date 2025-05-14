@@ -27,7 +27,9 @@ let redirectTimer: ReturnType<typeof setTimeout>;
 // 웹소켓 연결 설정
 const setupWebSocket = () => {
   // 웹소켓 서버 URL (실제 환경에 맞게 수정해야 함)
-  const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/api/ws/payment';
+  // const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/api/ws/payment';
+  // 방법 2: 템플릿 리터럴 사용
+const wsUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol === 'https:' ? 'wss://' : 'ws://'}${window.location.host}/api/ws/payment`;
   socket.value = new WebSocket(wsUrl);
 
   // 웹소켓 이벤트 핸들러 등록

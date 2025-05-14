@@ -2,12 +2,14 @@ import { createRouter, createWebHistory } from 'vue-router'
 import OrderView from '../views/OrderView.vue'
 import PaymentView from '../views/PaymentView.vue'
 import PaymentSuccessView from '../views/PaymentSuccessView.vue'
-import AdminView from '../views/AdminView.vue'
-import CategoryView from '../views/AdminView/CategoryView.vue'
-import MenuView from '../views/AdminView/MenuView.vue'
-import OrderManageView from '../views/AdminView/OrderManageView.vue'
-import StatisticView from '../views/AdminView/StatisticView.vue'
-import MemoView from '../views/AdminView/MemoView.vue'
+
+// Admin 관련 컴포넌트를 레이지 로딩으로 변경
+const AdminView = () => import('../views/AdminView.vue')
+const CategoryView = () => import('../views/AdminView/CategoryView.vue')
+const MenuView = () => import('../views/AdminView/MenuView.vue')
+const OrderManageView = () => import('../views/AdminView/OrderManageView.vue')
+const StatisticView = () => import('../views/AdminView/StatisticView.vue')
+const MemoView = () => import('../views/AdminView/MemoView.vue')
 
 const routes = [
   {
