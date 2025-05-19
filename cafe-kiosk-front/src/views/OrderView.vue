@@ -191,6 +191,7 @@ import {
   ShoppingCartFull,
   Plus
 } from '@element-plus/icons-vue';
+import { ElMessage } from 'element-plus';
 
 const router = useRouter();
 
@@ -222,9 +223,9 @@ const paginatedMenuItems = computed(() => {
 });
 
 // 총 페이지 수
-const totalPages = computed(() => {
-  return Math.ceil(menuItems.value.length / itemsPerPage);
-});
+// const totalPages = computed(() => {
+//   return Math.ceil(menuItems.value.length / itemsPerPage);
+// });
 
 // 카테고리가 변경되면 해당 카테고리의 메뉴를 불러오는 함수
 const loadMenuItems = async (categoryId: number) => {
