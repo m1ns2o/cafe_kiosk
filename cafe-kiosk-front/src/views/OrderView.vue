@@ -47,7 +47,7 @@
             >
               <div class="menu-image">
                 <el-image
-                  :src="`http://localhost:8080${item.image_url}`"
+                  :src="item.image_url"
                   :alt="item.name"
                   fit="contain"
                   loading="lazy"
