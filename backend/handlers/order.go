@@ -308,6 +308,30 @@ func CreateOrder(c *gin.Context) {
     c.JSON(http.StatusCreated, completeOrder)
 }
 
+// DeleteOrder 함수 (주문 삭제를 위한 함수)
+func DeleteOrder(c *gin.Context) {
+    id := c.Param("id")
+    var order models.Order
+    
+    // 주문이 존재하는지 확인
+    if err := database.DB.First(&order, id).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Order not found"})
+        return
+    }
+
+    // 주문 삭제
+    if err := database.DB.Delete(&order).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    // SSE 브로드캐스트를 위한 빈 주문 객체 생성
+    emptyOrder := models.Order{ID: order.ID}
+    broadcaster <- emptyOrder
+
+    c.JSON(http.StatusOK, gin.H{"message": "Order deleted successfully"})
+}
+
 // UpdateOrder 함수 (주문 업데이트를 위한 추가 함수)
 func UpdateOrder(c *gin.Context) {
     id := c.Param("id")
